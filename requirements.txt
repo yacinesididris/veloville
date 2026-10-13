@@ -1,0 +1,28 @@
+# Dépendances du projet VéloVille.
+# À compléter : fixez une version pour chaque ligne (pip freeze ou
+# pip index versions <paquet>) avant le dépôt du dossier.
+
+# API
+fastapi
+uvicorn
+sqlalchemy
+psycopg[binary]
+pydantic
+python-dotenv
+
+# Sécurité
+pyjwt
+bcrypt
+# passlib[bcrypt] est utilisable à condition d'épingler bcrypt<4.1
+
+# Données
+pandas
+
+# Front
+streamlit
+requests
+
+# Tests
+pytest
+pytest-cov
+httpx
