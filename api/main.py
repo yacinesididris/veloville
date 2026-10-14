@@ -5,3 +5,16 @@ incidents, indicateurs) et exposer GET /sante -> {"statut": "ok"}.
 
 Lancement : uvicorn api.main:app --reload
 """
+
+
+from fastapi import FastAPI
+from api.database import init_db
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def lifespan(app : FastAPI):
+	init_db()
+	yield
+
+app = FastAPI(title="Titre de l'API", lifespan=lifespan)
