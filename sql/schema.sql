@@ -45,7 +45,16 @@ CREATE TABLE IF NOT EXISTS incident (
         CHECK (cible IN ('velo', 'station')),
     velo_id VARCHAR(8),
     station_id VARCHAR(10) REFERENCES station(station_id),
-    statut VARCHAR(10) NOT NULL 
+    type_incident VARCHAR (30) NOT NULL
+		CHECK (type_incident IN ('vandalisme', 
+								'selle abimee', 
+								'eclairage HS', 
+								'chaine deraillee', 
+								'ecran borne illisible', 
+								'pneu creve', 
+								'frein defectueux', 
+								'borne hors service')),
+	statut VARCHAR(10) NOT NULL 
         CHECK (statut IN ('ouvert', 'en cours', 'resolu')),
     date_resolution TIMESTAMP,
     technicien VARCHAR(100),
@@ -88,6 +97,7 @@ CREATE INDEX IF NOT EXISTS idx_station_arrivee on trajet(station_arrivee);
 CREATE INDEX IF NOT EXISTS idx_date_signalement on incident(date_signalement);
 CREATE INDEX IF NOT EXISTS idx_resolution on incident(date_resolution);
 CREATE INDEX IF NOT EXISTS idx_username on utilisateur(username);
+
 
 
 

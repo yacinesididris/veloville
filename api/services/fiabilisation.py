@@ -137,7 +137,7 @@ def nettoyage_ref_station_id_obligatoire (dataframe: pd.DataFrame, nom_colonne: 
         for index in df.index[masque_rejete]
     ]
 
-    df.loc[masque_corrige, "station_id"] = apres_normalisation[masque_corrige]
+    df.loc[masque_corrige, nom_colonne] = apres_normalisation[masque_corrige]
     df = df.loc[~masque_rejete]
 
     return df, logs
@@ -171,7 +171,7 @@ def nettoyage_ref_station_id_optionnel(dataframe: pd.DataFrame, nom_colonne: str
         for index in df.index[masque_rejete]
     ]
 
-    df.loc[masque_corrige, "station_id"] = apres_normalisation[masque_corrige]
+    df.loc[masque_corrige, nom_colonne] = apres_normalisation[masque_corrige]
     df = df.loc[~masque_rejete]
 
     return df, logs

@@ -18,3 +18,8 @@ async def lifespan(app : FastAPI):
 	yield
 
 app = FastAPI(title="Titre de l'API", lifespan=lifespan)
+
+
+@app.get("/sante")
+def verifier_sante():
+    return {"statut" : "ok"}

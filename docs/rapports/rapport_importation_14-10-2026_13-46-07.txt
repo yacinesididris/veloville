@@ -1,0 +1,159 @@
+=============== RAPPORT DE FIABILISATION ===============
+
+=============== Stations
+
+
+
+=============== Trajets
+
+Ligne 87 | Décision : normalisé | Motif : velo_id mal formaté (casse/espaces)
+Ligne 609 | Décision : normalisé | Motif : velo_id mal formaté (casse/espaces)
+Ligne 934 | Décision : normalisé | Motif : velo_id mal formaté (casse/espaces)
+Ligne 1365 | Décision : normalisé | Motif : velo_id mal formaté (casse/espaces)
+Ligne 1693 | Décision : normalisé | Motif : velo_id mal formaté (casse/espaces)
+Ligne 1917 | Décision : normalisé | Motif : velo_id mal formaté (casse/espaces)
+Ligne 153 | Décision : rejeté | Motif : horodatage invalide dans la colonne depart_horodatage
+Ligne 382 | Décision : rejeté | Motif : horodatage invalide dans la colonne depart_horodatage
+Ligne 1598 | Décision : rejeté | Motif : horodatage invalide dans la colonne depart_horodatage
+Ligne 1895 | Décision : rejeté | Motif : horodatage invalide dans la colonne depart_horodatage
+Ligne 1969 | Décision : rejeté | Motif : horodatage invalide dans la colonne depart_horodatage
+Ligne 29 | Décision : référence mise à nul | Motif : station_arrivee inconnue (S999)
+Ligne 33 | Décision : référence mise à nul | Motif : station_arrivee inconnue (S999)
+Ligne 236 | Décision : référence mise à nul | Motif : station_arrivee inconnue (S999)
+Ligne 863 | Décision : référence mise à nul | Motif : station_arrivee inconnue (S999)
+Ligne 1470 | Décision : référence mise à nul | Motif : station_arrivee inconnue (S999)
+Ligne 1725 | Décision : référence mise à nul | Motif : station_arrivee inconnue (S999)
+Ligne 599 | Décision : rejeté | Motif : trajet invalide (durée nulle, négative, manquante ou illisible)
+Ligne 600 | Décision : rejeté | Motif : trajet invalide (durée nulle, négative, manquante ou illisible)
+Ligne 716 | Décision : rejeté | Motif : trajet invalide (durée nulle, négative, manquante ou illisible)
+Ligne 904 | Décision : rejeté | Motif : trajet invalide (durée nulle, négative, manquante ou illisible)
+Ligne 929 | Décision : rejeté | Motif : trajet invalide (durée nulle, négative, manquante ou illisible)
+Ligne 1073 | Décision : rejeté | Motif : trajet invalide (durée nulle, négative, manquante ou illisible)
+Ligne 1080 | Décision : rejeté | Motif : trajet invalide (durée nulle, négative, manquante ou illisible)
+Ligne 1280 | Décision : rejeté | Motif : trajet invalide (durée nulle, négative, manquante ou illisible)
+Ligne 1696 | Décision : rejeté | Motif : trajet invalide (durée nulle, négative, manquante ou illisible)
+Ligne 1856 | Décision : rejeté | Motif : trajet invalide (durée nulle, négative, manquante ou illisible)
+Ligne 73 | Décision : rejeté | Motif : doublon sur la clé trajet_id
+Ligne 79 | Décision : rejeté | Motif : doublon sur la clé trajet_id
+Ligne 290 | Décision : rejeté | Motif : doublon sur la clé trajet_id
+Ligne 296 | Décision : rejeté | Motif : doublon sur la clé trajet_id
+Ligne 852 | Décision : rejeté | Motif : doublon sur la clé trajet_id
+Ligne 951 | Décision : rejeté | Motif : doublon sur la clé trajet_id
+Ligne 1632 | Décision : rejeté | Motif : doublon sur la clé trajet_id
+Ligne 1644 | Décision : rejeté | Motif : doublon sur la clé trajet_id
+Ligne 1785 | Décision : rejeté | Motif : doublon sur la clé trajet_id
+Ligne 1844 | Décision : rejeté | Motif : doublon sur la clé trajet_id
+Ligne 1938 | Décision : rejeté | Motif : doublon sur la clé trajet_id
+
+
+=============== Incidents
+
+Ligne 27 | Décision : rejeté | Motif : date de résolution incohérente
+Ligne 123 | Décision : rejeté | Motif : date de résolution incohérente
+Ligne 177 | Décision : rejeté | Motif : date de résolution incohérente
+Ligne 0 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 2 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 3 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 5 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 6 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 7 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 8 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 11 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 13 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 14 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 15 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 16 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 17 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 19 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 20 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 21 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 24 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 25 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 26 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 28 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 29 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 31 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 32 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 35 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 36 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 38 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 39 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 42 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 43 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 45 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 46 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 49 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 51 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 52 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 58 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 59 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 60 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 63 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 64 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 65 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 68 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 72 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 76 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 77 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 79 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 81 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 83 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 86 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 89 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 90 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 91 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 93 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 100 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 101 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 102 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 104 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 105 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 106 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 107 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 108 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 109 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 110 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 111 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 120 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 124 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 125 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 126 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 127 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 129 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 130 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 132 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 133 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 134 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 135 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 136 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 139 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 140 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 141 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 143 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 144 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 148 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 149 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 150 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 152 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 155 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 158 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 159 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 160 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 163 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 164 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 168 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 169 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 170 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 172 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 173 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 178 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+Ligne 179 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
+
+
+=============== RAPPORT D'IMPORT ===============
+
+Stations insérées : 0
+Trajets insérés : 0
+Incidents insérés : 0
+Incidents mis à jour : 177
+
