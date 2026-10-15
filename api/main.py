@@ -10,7 +10,7 @@ Lancement : uvicorn api.main:app --reload
 from fastapi import FastAPI
 from api.database import init_db
 from contextlib import asynccontextmanager
-
+from api.routers import indicateurs
 
 @asynccontextmanager
 async def lifespan(app : FastAPI):
@@ -19,7 +19,8 @@ async def lifespan(app : FastAPI):
 
 app = FastAPI(title="Titre de l'API", lifespan=lifespan)
 
-
 @app.get("/sante")
 def verifier_sante():
     return {"statut" : "ok"}
+
+app.include_router(indicateurs.router)

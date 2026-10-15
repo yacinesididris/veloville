@@ -7,8 +7,31 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class ConnexionRequete(BaseModel):
+    username: str = Field(max_length=50)
+    password: str
 
-class StationAjout(BaseModel):
+
+class ConnexionReponse(BaseModel):
+    access_token: str
+    token_type: Literal["bearer"]
+    role: Literal["exploitant", "direction"]
+
+
+
+
+class ActiviteParJourParametres(BaseModel):
+    date_debut: date | None = None
+    date_fin: date | None = None
+
+
+class StationsActivesParametres(BaseModel):
+    limite: int = Field(default=10, ge=1)
+
+
+class StationReponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     station_id: str = Field(max_length=10)
     nom: str = Field(max_length=100)
     commune: str = Field(max_length=100)
@@ -22,11 +45,9 @@ class StationAjout(BaseModel):
     date_mise_en_service: date
 
 
-class StationReponse(StationAjout):
+class TrajetReponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-
-class TrajetAjout(BaseModel):
     trajet_id: str = Field(max_length=12)
     velo_id: str = Field(max_length=8)
     depart_horodatage: datetime
@@ -36,14 +57,10 @@ class TrajetAjout(BaseModel):
     type_usager: Literal["abonne", "occasionnel"]
     usager_ref: str | None = Field(default=None, max_length=9)
 
-    #La contrainte type_usager/usager_ref est déjà vérifiée à l'import CSV
 
-
-class TrajetReponse(TrajetAjout):
+class IncidentReponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-
-class IncidentAjout(BaseModel):
     incident_id: str = Field(max_length=12)
     date_signalement: datetime
     cible: Literal["velo", "station"]
@@ -63,12 +80,36 @@ class IncidentAjout(BaseModel):
     date_resolution: datetime | None = None
     technicien: str | None = Field(default=None, max_length=100)
 
-    # Les contraintes entre cible, références et dates sont vérifiées à l'import CSV.
-
-
-class IncidentReponse(IncidentAjout):
-    model_config = ConfigDict(from_attributes=True)
-
 
 class IncidentUpdate(BaseModel):
-    pass
+    statut: Literal["en_cours", "resolu"]
+
+
+class ActiviteJourReponse(BaseModel):
+    jour: date
+    nb_trajets: int = Field(ge=0)
+
+
+class ActiviteParJourReponse(BaseModel):
+    donnees: list[ActiviteJourReponse]
+
+
+class StationActiveReponse(BaseModel):
+    station_id: str = Field(max_length=10)
+    nom: str = Field(max_length=100)
+    nb_departs: int = Field(ge=0)
+    nb_arrivees: int = Field(ge=0)
+
+
+class StationsActivesReponse(BaseModel):
+    reponse: list[StationActiveReponse]
+
+
+class IncidentsParStatutItem(BaseModel):
+    statut: Literal["ouvert", "en_cours", "resolu"]
+    nb_incidents: int = Field(ge=0)
+
+
+class IncidentsParStatutReponse(BaseModel):
+    reponse: list[IncidentsParStatutItem]
+    delai_moyen_resolution_heures: float | None

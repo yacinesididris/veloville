@@ -1,17 +1,26 @@
-"""Routeur indicateurs.
+"""Routes des indicateurs."""
 
-À compléter : GET /indicateurs/activite-par-jour,
-GET /indicateurs/stations-actives et
-GET /indicateurs/incidents-par-statut.
-"""
+from datetime import date
 
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+
 from api.database import get_db
+from api.schemas import ActiviteParJourReponse
+from api.services.indicateurs import activite_par_jour
 
-from fastapi import APIRouter, Depends
+router = APIRouter(prefix="/indicateurs")
 
-@router.get("/", response_model=list[VenteOut])
-def get_ventes(db: Session = Depends(get_db)):
-    stmt = select(VenteModel)
-    return db.scalars(stmt).all()
+
+@router.get("/activite-par-jour", response_model=ActiviteParJourReponse)
+def get_activite_par_jour(
+    date_debut: date | None = None,
+    date_fin: date | None = None,
+    db: Session = Depends(get_db),
+):
+    try:
+        donnees = activite_par_jour(db, date_debut, date_fin)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    return {"donnees": donnees}
