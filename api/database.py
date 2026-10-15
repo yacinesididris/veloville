@@ -26,6 +26,5 @@ def get_db():
 
 def init_db():
     """Crée les tables ORM déclarées, si elles n'existent pas encore."""
-    import api.models  # noqa: F401
-
+    import api.models
     Base.metadata.create_all(bind=engine)

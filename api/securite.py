@@ -1,4 +1,4 @@
-"""Authentification JWT et contrôle des rôles."""
+"""Fonctions de sécurité : bcrypt et JWT."""
 
 from datetime import datetime, timedelta, timezone
 from typing import Callable
@@ -16,61 +16,110 @@ from api.models import Utilisateur
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
-def verifier_mot_de_passe(mot_de_passe: str, mot_de_passe_hash: str) -> bool:
+def hash_password(plain_password: str) -> str:
+    """Transforme un mot de passe en hash bcrypt avant stockage en base."""
+
+    # gensalt() génère un sel aléatoire intégré directement dans le hash bcrypt.
+    salt = bcrypt.gensalt()
+
+    # hashpw() produit le hash à partir du mot de passe + du sel.
+    hashed = bcrypt.hashpw(
+        plain_password.encode("utf-8"),
+        salt,
+    )
+
+    return hashed.decode("utf-8")
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Vérifie si le mot de passe saisi correspond au hash stocké."""
+
+    # checkpw() refait le calcul bcrypt avec les informations contenues dans le hash.
+    # On ne déchiffre donc jamais le mot de passe enregistré.
     return bcrypt.checkpw(
-        mot_de_passe.encode("utf-8"),
-        mot_de_passe_hash.encode("utf-8"),
+        plain_password.encode("utf-8"),
+        hashed_password.encode("utf-8"),
     )
 
 
-def creer_jeton(utilisateur: Utilisateur) -> str:
-    maintenant = datetime.now(timezone.utc)
-    charge_utile = {
+def create_access_token(utilisateur: Utilisateur) -> str:
+    """Crée un JWT signé pour l'utilisateur authentifié."""
+
+    now = datetime.now(timezone.utc)
+    expiration = now + timedelta(minutes=JWT_EXPIRE_MINUTES)
+
+    payload = {
+        # sub ("subject") identifie l'utilisateur auquel appartient le token.
         "sub": str(utilisateur.id_utilisateur),
+
+        # sub ("subject") : le role
         "role": utilisateur.role,
-        "iat": maintenant,
-        "exp": maintenant + timedelta(minutes=JWT_EXPIRE_MINUTES),
+
+        # iat indique quand le token a été créé.
+        "iat": now,
+
+        # exp fixe la date après laquelle le token n'est plus accepté.
+        "exp": expiration,
+
     }
-    return jwt.encode(charge_utile, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+    # encode() signe le contenu avec JWT_SECRET.
+    # Le token peut être lu, mais une modification casserait sa signature.
+    return jwt.encode(
+        payload,
+        JWT_SECRET,
+        algorithm=JWT_ALGORITHM,
+    )
 
 
-def utilisateur_courant(
+def decode_access_token(token: str) -> dict:
+    """Vérifie la signature et l'expiration puis retourne le payload."""
+
+    # decode() refuse un token modifié, mal signé ou expiré.
+    return jwt.decode(
+        token,
+        JWT_SECRET,
+        algorithms=[JWT_ALGORITHM],
+    )
+
+
+def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> Utilisateur:
-    erreur_auth = HTTPException(
+    """Retourne l'utilisateur associé au JWT fourni dans l'en-tête."""
+
+    authentication_error = HTTPException(
         status_code=401,
         detail="Authentification requise",
         headers={"WWW-Authenticate": "Bearer"},
     )
     if credentials is None:
-        raise erreur_auth
+        raise authentication_error
 
     try:
-        charge_utile = jwt.decode(
-            credentials.credentials,
-            JWT_SECRET,
-            algorithms=[JWT_ALGORITHM],
-        )
-        identifiant = int(charge_utile["sub"])
+        payload = decode_access_token(credentials.credentials)
+        user_id = int(payload["sub"])
     except (jwt.InvalidTokenError, KeyError, TypeError, ValueError) as exc:
-        raise erreur_auth from exc
+        raise authentication_error from exc
 
-    utilisateur = db.get(Utilisateur, identifiant)
+    utilisateur = db.get(Utilisateur, user_id)
     if utilisateur is None:
-        raise erreur_auth
+        raise authentication_error
     return utilisateur
 
 
-def exiger_role(role_requis: str) -> Callable:
-    def verifier_role(
-        utilisateur: Utilisateur = Depends(utilisateur_courant),
+def require_role(role: str) -> Callable:
+    """Construit une dépendance qui limite l'accès à un rôle."""
+
+    def check_role(
+        utilisateur: Utilisateur = Depends(get_current_user),
     ) -> Utilisateur:
-        if utilisateur.role != role_requis:
+        if utilisateur.role != role:
             raise HTTPException(
                 status_code=403,
                 detail="Acces reserve au role exploitant",
             )
         return utilisateur
 
-    return verifier_role
+    return check_role

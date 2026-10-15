@@ -6,3 +6,10 @@ message d'erreur en français en cas d'échec.
 
 Lancement : streamlit run front/app.py
 """
+
+
+import streamlit as st
+
+st.title("Ma première app")
+st.write("Bonjour Lumina !")
+

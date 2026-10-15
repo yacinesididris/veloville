@@ -3,38 +3,53 @@
 from datetime import datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from api.database import get_db
 from api.models import Incident
-from api.schemas import IncidentReponse, IncidentUpdate
-from api.securite import exiger_role, utilisateur_courant
+from api.schemas import IncidentReponse, IncidentUpdate, PageReponse
+from api.securite import get_current_user, require_role
 
 router = APIRouter(prefix="/incidents", tags=["Incidents"])
 
 
 @router.get(
     "",
-    response_model=list[IncidentReponse],
-    dependencies=[Depends(utilisateur_courant)],
+    response_model=PageReponse[IncidentReponse],
+    dependencies=[Depends(get_current_user)],
 )
 def lister_incidents(
     statut: Literal["ouvert", "en_cours", "resolu"] | None = None,
+    page: int = Query(default=1, ge=1),
+    taille_page: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
-) -> list[Incident]:
-    requete = select(Incident)
+) -> dict:
+    filtres = []
     if statut is not None:
-        requete = requete.where(Incident.statut == statut)
-    requete = requete.order_by(Incident.date_signalement.desc())
-    return list(db.scalars(requete).all())
+        filtres.append(Incident.statut == statut)
+
+    total = db.scalar(select(func.count()).select_from(Incident).where(*filtres))
+    requete = (
+        select(Incident)
+        .where(*filtres)
+        .order_by(Incident.date_signalement.desc(), Incident.incident_id)
+        .offset((page - 1) * taille_page)
+        .limit(taille_page)
+    )
+    return {
+        "total": total or 0,
+        "page": page,
+        "taille_page": taille_page,
+        "resultats": list(db.scalars(requete).all()),
+    }
 
 
 @router.put(
     "/{incident_id}/statut",
     response_model=IncidentReponse,
-    dependencies=[Depends(exiger_role("exploitant"))],
+    dependencies=[Depends(require_role("exploitant"))],
 )
 def modifier_statut_incident(
     incident_id: str,

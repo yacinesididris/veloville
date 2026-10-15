@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from api.database import get_db
 from api.models import Utilisateur
 from api.schemas import ConnexionReponse, ConnexionRequete
-from api.securite import creer_jeton, verifier_mot_de_passe
+from api.securite import create_access_token, verify_password
 
 router = APIRouter(prefix="/auth", tags=["Authentification"])
 
@@ -20,13 +20,13 @@ def login(
     utilisateur = db.scalar(
         select(Utilisateur).where(Utilisateur.username == requete.username)
     )
-    if utilisateur is None or not verifier_mot_de_passe(
+    if utilisateur is None or not verify_password(
         requete.password, utilisateur.mot_de_passe_hash
     ):
         raise HTTPException(status_code=401, detail="Identifiants invalides")
 
     return ConnexionReponse(
-        access_token=creer_jeton(utilisateur),
+        access_token=create_access_token(utilisateur),
         token_type="bearer",
         role=utilisateur.role,
     )

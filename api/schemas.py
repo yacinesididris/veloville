@@ -2,9 +2,12 @@
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Generic, Literal, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
+
+
+T = TypeVar("T")
 
 
 class ConnexionRequete(BaseModel):
@@ -76,6 +79,13 @@ class IncidentReponse(BaseModel):
 
 class IncidentUpdate(BaseModel):
     statut: Literal["en_cours", "resolu"]
+
+
+class PageReponse(BaseModel, Generic[T]):
+    total: int
+    page: int
+    taille_page: int
+    resultats: list[T]
 
 
 class ActiviteJourReponse(BaseModel):

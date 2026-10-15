@@ -2,50 +2,64 @@
 
 from datetime import date, datetime, time, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import or_, select
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from api.database import get_db
 from api.models import Trajet
-from api.schemas import TrajetReponse
-from api.securite import utilisateur_courant
+from api.schemas import PageReponse, TrajetReponse
+from api.securite import get_current_user
 
 router = APIRouter(
     prefix="/trajets",
     tags=["Trajets"],
-    dependencies=[Depends(utilisateur_courant)],
+    dependencies=[Depends(get_current_user)],
 )
 
 
-@router.get("", response_model=list[TrajetReponse])
+@router.get("", response_model=PageReponse[TrajetReponse])
 def lister_trajets(
     date_debut: date | None = None,
     date_fin: date | None = None,
     station: str | None = None,
+    page: int = Query(default=1, ge=1),
+    taille_page: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
-) -> list[Trajet]:
+) -> dict:
     if date_debut is not None and date_fin is not None and date_fin < date_debut:
         raise HTTPException(
             status_code=422,
             detail="La date de fin doit être égale ou postérieure à la date de début.",
         )
 
-    requete = select(Trajet)
+    filtres = []
     if date_debut is not None:
-        requete = requete.where(
+        filtres.append(
             Trajet.depart_horodatage >= datetime.combine(date_debut, time.min)
         )
     if date_fin is not None:
         lendemain = datetime.combine(date_fin + timedelta(days=1), time.min)
-        requete = requete.where(Trajet.depart_horodatage < lendemain)
+        filtres.append(Trajet.depart_horodatage < lendemain)
     if station is not None:
-        requete = requete.where(
+        filtres.append(
             or_(
                 Trajet.station_depart == station,
                 Trajet.station_arrivee == station,
             )
         )
 
-    requete = requete.order_by(Trajet.depart_horodatage)
-    return list(db.scalars(requete).all())
+    total = db.scalar(select(func.count()).select_from(Trajet).where(*filtres))
+    requete = (
+        select(Trajet)
+        .where(*filtres)
+        .order_by(Trajet.depart_horodatage, Trajet.trajet_id)
+        .offset((page - 1) * taille_page)
+        .limit(taille_page)
+    )
+    return {
+        "total": total or 0,
+        "page": page,
+        "taille_page": taille_page,
+        "resultats": list(db.scalars(requete).all()),
+    }

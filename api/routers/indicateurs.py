@@ -16,12 +16,12 @@ from api.services.indicateurs import (
     incidents_par_statut,
     stations_actives,
 )
-from api.securite import utilisateur_courant
+from api.securite import get_current_user
 
 router = APIRouter(
     prefix="/indicateurs",
     tags=["Indicateurs"],
-    dependencies=[Depends(utilisateur_courant)],
+    dependencies=[Depends(get_current_user)],
 )
 
 
