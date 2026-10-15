@@ -11,7 +11,7 @@ Usage prévu : python scripts/importer.py [--dossier data]
 
 import pandas as pd 
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy import MetaData, Table, select
+from sqlalchemy import MetaData, Table
 from api.database import engine
 from datetime import datetime
 from pathlib import Path
@@ -124,11 +124,10 @@ def preparation_incidents(df: pd.DataFrame, station_ids: set[str]):
     return df, logs_import_incidents
 
 
-# permet d'UPDATE et INSERT en controlant les doublons dans la table (update choisit si on ignore ou on update)
-def upsert(df, nom_table, nom_colonne_pk, update=False):
-    
+# Insère les lignes sans modifier celles dont la clé primaire existe déjà.
+def inserer_sans_doublons(df, nom_table, nom_colonne_pk):
     if df.empty:
-        return 0, 0
+        return 0
     
     #examine la table et l'inscrit dans le registre metadata pour récupérer les colonnes et types de données
     table = Table(nom_table,metadata,autoload_with=engine)
@@ -143,51 +142,15 @@ def upsert(df, nom_table, nom_colonne_pk, update=False):
 
     stmt = insert(table).values(lignes)
 
-    #permet de choisir si on veut mettre à jour ou ignorer les doublons
-    if update:
-
-        colonnes_en_doublon = [
-            c for c in df.columns
-            if c != nom_colonne_pk
-        ]
-
-        stmt = stmt.on_conflict_do_update(
-            #index_elements = fait partie de la methode on_conflict_do_update, permet de spécifier la colonne qui est la clé primaire
-            index_elements=[nom_colonne_pk], 
-            # génére un dict à partir d'une boucle.
-            set_={
-                c: stmt.excluded[c]      #{ clé: valeur for x in iterable } 
-                for c in colonnes_en_doublon
-            }
-        )
-
-    else:
-
-        # index_elements désigne la clé primaire utilisée pour repérer les doublons.
-        stmt = stmt.on_conflict_do_nothing(
-            index_elements=[nom_colonne_pk]
-        )
+    stmt = stmt.on_conflict_do_nothing(index_elements=[nom_colonne_pk])
 
     stmt = stmt.returning(table.c[nom_colonne_pk])
 
     with engine.begin() as conn:
-        existing_ids = set()
-        if update:
-            existing_ids = set(
-                conn.execute(
-                    select(table.c[nom_colonne_pk]).where(
-                        table.c[nom_colonne_pk].in_(df[nom_colonne_pk].tolist())
-                    )
-                ).scalars()
-            )
         result = conn.execute(stmt)
         affected_ids = result.scalars().all()
 
-    if not update:
-        return len(affected_ids), 0
-
-    updated = sum(id_ in existing_ids for id_ in affected_ids)
-    return len(affected_ids) - updated, updated
+    return len(affected_ids)
 
 
 def generer_rapport_import(logs_stations, 
@@ -195,8 +158,7 @@ def generer_rapport_import(logs_stations,
                            logs_incidents,
                            nb_stations,
                            nb_trajets,
-                           nb_incidents_inseres,
-                           nb_incidents_mis_a_jour,
+                           nb_incidents,
                            fichiers_absents):
     date_rapport = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
 
@@ -239,8 +201,7 @@ def generer_rapport_import(logs_stations,
 
         f.write(f"Stations insérées : {nb_stations}\n")
         f.write(f"Trajets insérés : {nb_trajets}\n")
-        f.write(f"Incidents insérés : {nb_incidents_inseres}\n")
-        f.write(f"Incidents mis à jour : {nb_incidents_mis_a_jour}\n\n")
+        f.write(f"Incidents insérés : {nb_incidents}\n\n")
 
         if fichiers_absents:
             f.write("=============== FICHIERS ABSENTS ===============\n\n")
@@ -281,13 +242,10 @@ def importer_csv():
         fichiers_absents.append(incidents_path)
 
 
-    nb_stations, _ = upsert(df_stations,"station","station_id",update=False)
-    nb_trajets, _ = upsert(df_trajets,"trajet","trajet_id",update=False)
-    nb_incidents_inseres, nb_incidents_mis_a_jour = upsert(
-        df_incidents,
-        "incident",
-        "incident_id",
-        update=True,
+    nb_stations = inserer_sans_doublons(df_stations, "station", "station_id")
+    nb_trajets = inserer_sans_doublons(df_trajets, "trajet", "trajet_id")
+    nb_incidents = inserer_sans_doublons(
+        df_incidents, "incident", "incident_id"
     )
 
     generer_rapport_import(
@@ -296,8 +254,7 @@ def importer_csv():
         logs_incidents,
         nb_stations,
         nb_trajets,
-        nb_incidents_inseres,
-        nb_incidents_mis_a_jour,
+        nb_incidents,
         fichiers_absents,
     )
 

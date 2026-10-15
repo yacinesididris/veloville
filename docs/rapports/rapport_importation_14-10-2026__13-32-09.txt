@@ -147,5 +147,4 @@ Ligne 179 | Décision : normalisé | Motif : statut mal formaté (casse/espaces)
 
 Stations insérées : 120
 Trajets insérés : 2004
-Incidents insérés ou mis à jour : 177
-
+Incidents chargés : 177

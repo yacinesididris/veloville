@@ -208,5 +208,3 @@ Ligne 179 | Décision : avertissement | Motif : technicien manquant pour un inci
 Stations insérées : 120
 Trajets insérés : 2004
 Incidents insérés : 177
-Incidents mis à jour : 0
-
