@@ -3,18 +3,13 @@
 La base PostgreSQL est composée de quatre tables : `station`, `trajet`,
 `incident` et `utilisateur`.
 
+## MCD
+
+![MCD de la base de données VéloVille](images/MCD.png)
+
 ## MLD
 
-```text
-station (station_id PK)
-  1 ─── 0..N trajet.station_depart
-  0..1 ─ 0..N trajet.station_arrivee
-  0..N ─ 0..1 incident.station_id
-
-trajet (trajet_id PK)
-incident (incident_id PK)
-utilisateur (id_utilisateur PK, username UNIQUE)
-```
+![MLD de la base de données VéloVille](images/MLD.png)
 
 Une station peut être référencée par plusieurs trajets comme départ ou arrivée
 et par plusieurs incidents. L'arrivée d'un trajet et la station d'un incident
