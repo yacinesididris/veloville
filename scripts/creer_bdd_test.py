@@ -1,12 +1,15 @@
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 from api.config import DATABASE_URL
 
 
 def cloner_base_de_donnees(base_a_copier: str, nom_base_test: str):
     """  Créer une BDD test à partir de la vraie. """
 
+    # La copie doit être créée depuis une base différente de la base modèle.
+    url_admin = make_url(DATABASE_URL).set(database="postgres")
     engine = create_engine(
-        DATABASE_URL,
+        url_admin,
 
         # isolation_level="AUTOCOMMIT" : permet ne pas faire de transaction (postgresql refuse les CREATE DATABASE dans une transaction)
         isolation_level="AUTOCOMMIT" 
