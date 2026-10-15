@@ -16,8 +16,13 @@ from api.services.indicateurs import (
     incidents_par_statut,
     stations_actives,
 )
+from api.securite import utilisateur_courant
 
-router = APIRouter(prefix="/indicateurs", tags=["Indicateurs"])
+router = APIRouter(
+    prefix="/indicateurs",
+    tags=["Indicateurs"],
+    dependencies=[Depends(utilisateur_courant)],
+)
 
 
 @router.get("/activite-par-jour", response_model=ActiviteParJourReponse)

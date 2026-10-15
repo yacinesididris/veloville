@@ -7,20 +7,28 @@ Lancement : uvicorn api.main:app --reload
 """
 
 
-from fastapi import FastAPI
-from api.database import init_db
 from contextlib import asynccontextmanager
-from api.routers import indicateurs
+
+from fastapi import FastAPI
+
+from api.database import init_db
+from api.routers import auth, incidents, indicateurs, stations, trajets
 
 @asynccontextmanager
-async def lifespan(app : FastAPI):
-	init_db()
-	yield
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
 
-app = FastAPI(title="Titre de l'API", lifespan=lifespan)
 
-@app.get("/sante", tags=["Santé"])
+app = FastAPI(title="API VéloVille", lifespan=lifespan)
+
+
+@app.get("/sante", tags=["Sante"])
 def verifier_sante():
-    return {"statut" : "ok"}
+    return {"statut": "ok"}
 
+app.include_router(auth.router)
+app.include_router(stations.router)
+app.include_router(trajets.router)
+app.include_router(incidents.router)
 app.include_router(indicateurs.router)

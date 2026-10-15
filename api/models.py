@@ -54,8 +54,9 @@ class Incident(Base):
     date_signalement: Mapped[datetime] = mapped_column(DateTime)
     cible: Mapped[str] = mapped_column(String(50))
     velo_id: Mapped[str | None] = mapped_column(String(8))
-    station_id: Mapped[str] = mapped_column(String(10), 
-                                                ForeignKey("station.station_id"))
+    station_id: Mapped[str | None] = mapped_column(
+        String(10), ForeignKey("station.station_id")
+    )
     type_incident: Mapped[str] = mapped_column(String(50))
     statut: Mapped[str] = mapped_column(String(10))
     date_resolution: Mapped[datetime | None] = mapped_column(DateTime)
