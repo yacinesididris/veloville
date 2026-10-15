@@ -10,11 +10,18 @@ Usage prévu : python scripts/importer.py [--dossier data]
 """
 
 import pandas as pd 
+import sys
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy import MetaData, Table
-from api.database import engine
 from datetime import datetime
 from pathlib import Path
+from argparse import ArgumentParser
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from api.database import engine
 from api.services.fiabilisation import (
 nettoyage_capacite_station,
 nettoyage_doublons, nettoyage_horodatage_obligatoire, nettoyage_trajets_invalides,
@@ -24,10 +31,6 @@ nettoyage_ref_velo_id_obligatoire, nettoyage_station_arrivee_inconnue,
 nettoyage_usager_ref_trajet, nettoyage_station_depart_inconnue,
 nettoyage_cible_incident, nettoyage_coherence_date_resolution,
 signaler_technicien_manquant)
-
-incidents_path = "data/incidents.csv"
-stations_path = "data/stations.csv"
-trajets_path = "data/trajets.csv"
 
 #sert de registre SQL pour les tables qu'on va manipuler pendant l'insertion (donne les colonnes et types de données)
 metadata = MetaData()
@@ -159,10 +162,13 @@ def generer_rapport_import(logs_stations,
                            nb_stations,
                            nb_trajets,
                            nb_incidents,
-                           fichiers_absents):
+                           fichiers_absents,
+                           dossier_rapports):
     date_rapport = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+    dossier_rapports.mkdir(parents=True, exist_ok=True)
+    chemin_rapport = dossier_rapports / f"rapport_importation_{date_rapport}.txt"
 
-    with open(f"./docs/rapports/rapport_importation_{date_rapport}.txt", "w", encoding="utf-8") as f:
+    with open(chemin_rapport, "w", encoding="utf-8") as f:
 
         f.write("=============== RAPPORT DE FIABILISATION ===============\n\n")
         f.write("=============== Stations\n\n")
@@ -207,11 +213,16 @@ def generer_rapport_import(logs_stations,
             f.write("=============== FICHIERS ABSENTS ===============\n\n")
             for fichier in fichiers_absents:
                 f.write(f"Fichier absent : {fichier}\n")
-            
-            
 
-def importer_csv():
+    return chemin_rapport
+
+
+def importer_csv(dossier_donnees: Path):
     fichiers_absents = []
+    dossier_donnees = Path(dossier_donnees)
+    stations_path = dossier_donnees / "stations.csv"
+    trajets_path = dossier_donnees / "trajets.csv"
+    incidents_path = dossier_donnees / "incidents.csv"
 
     if Path(stations_path).is_file():
         df_stations, logs_stations = preparation_stations(
@@ -248,7 +259,7 @@ def importer_csv():
         df_incidents, "incident", "incident_id"
     )
 
-    generer_rapport_import(
+    chemin_rapport = generer_rapport_import(
         logs_stations,
         logs_trajets,
         logs_incidents,
@@ -256,15 +267,23 @@ def importer_csv():
         nb_trajets,
         nb_incidents,
         fichiers_absents,
+        ROOT_DIR / "docs" / "rapports",
     )
 
-    print("Import terminé. Rapport généré dans docs/rapport_importation_csv.txt")
-
+    print(f"Import terminé. Rapport généré : {chemin_rapport}")
 
 
 
 def main():
-    importer_csv()
+    parser = ArgumentParser(description="Importe et fiabilise les fichiers CSV VéloVille.")
+    parser.add_argument(
+        "--dossier",
+        type=Path,
+        default=ROOT_DIR / "data",
+        help="Dossier contenant stations.csv, trajets.csv et incidents.csv (défaut : data).",
+    )
+    args = parser.parse_args()
+    importer_csv(args.dossier)
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 
 import streamlit as st
 
-from front.api_client import ErreurApi, get_stations
+from api_client import ErreurApi, get_stations
 
 st.title("Stations")
 

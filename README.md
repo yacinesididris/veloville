@@ -98,7 +98,7 @@ Un rapport de nettoyage des données et d'importation dans la base de donnée ap
 Depuis le terminal, lancer la commande suivante pour lancer le script :
 
 ```python
-python -m scripts.importer
+python scripts/importer.py
 ```
 
 
@@ -124,17 +124,30 @@ Pour lancer les tests, toujours depuis le terminal :
 ```python
 pytest --cov=api/services --cov-report=term-missing
 ```
+La couverture et le pourcentage de réussite s'afficheront dans le terminal 
+
+## Lancement du programme
+
+Dans le terminal, lancer l'API :
+
+
+```python
+uvicorn api.main:app --reload
+```
+
+Puis dans un autre terminal, toujours à la racine, lancer le front
+
+```python
+streamlit run front/app.py
+```
+
+# Documentation
 
 
 
-## Conventions
+## Notes de fin
 
-- Lancement de l'API depuis la racine : `uvicorn api.main:app --reload`.
-- Lancement du front depuis la racine : `streamlit run front/app.py`.
-- Tests et couverture : `pytest --cov=api/services --cov-report=term-missing`.
-- Les modules `api/services/fiabilisation.py` et `api/services/indicateurs.py`
-  sont les modules métier dont la couverture est mesurée.
-- Chaque stub indique dans sa docstring ce qu'il doit contenir. Les noms de
-  fichiers et de dossiers ne doivent pas être modifiés ; vous pouvez ajouter
-  des modules.
-- Mot de passe du compte PostgreSQL, secret JWT : uniquement dans `.env`.
+
+| Auteur | Version |
+|---|---|
+| Sid Idris Yacine | V1 |

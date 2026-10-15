@@ -2,7 +2,7 @@
 
 import streamlit as st
 
-from front.api_client import ErreurApi, post_login
+from api_client import ErreurApi, post_login
 
 st.title("VéloVille")
 
