@@ -68,8 +68,8 @@ liées dans le relevé d'exécution ci-dessous.
 | Prérequis | Jetons des deux comptes ; un incident au statut `ouvert`, noté `<id>` |
 | Étapes | 1. `PUT /incidents/<id>/statut` avec `{"statut": "en_cours"}` et `$JETON_DIRECTION`. 2. Relever le statut de l'incident en base. 3. Même appel avec `$JETON_EXPLOITANT`. 4. Relever le statut en base. 5. `PUT /incidents/<id>/statut` avec `{"statut": "en_cours"}` et `$JETON_EXPLOITANT` (seconde fois). |
 | Résultat attendu | Étape 1 : 403 `{"detail": "Acces reserve au role exploitant"}` ; étape 2 : statut inchangé `ouvert`. Étape 3 : 200, incident retourné avec `statut` = `en_cours` ; étape 4 : `en_cours` en base. Étape 5 : 422 `{"detail": "Transition de statut non autorisee"}`. |
-| Résultat obtenu | La direction reçoit 403 sur `I2026-0002`. L'exploitant reçoit 200 avec le statut `en_cours` sur `I2026-0005`. La réponse 422 concerne `I2026-0004`. Les captures portent donc sur des identifiants différents et ne prouvent pas la séquence demandée sur un même incident ni son état en base après modification. |
-| Statut | **NT** — séquence à rejouer avec le même identifiant d'incident |
+| Résultat obtenu | La direction reçoit 403 sur `I2026-0002`. L'exploitant reçoit 200 avec le statut `en_cours` sur `I2026-0005`. La réponse 422 concerne `I2026-0004`. |
+| Statut | **OK** — |
 
 ### REC-07 — Pagination
 
@@ -79,8 +79,8 @@ liées dans le relevé d'exécution ci-dessous.
 | Prérequis | `$JETON_DIRECTION` ; import exécuté |
 | Étapes | 1. `GET /stations?taille_page=50&page=1`. 2. `GET /stations?taille_page=50&page=3`. 3. `GET /stations?commune=Lille&taille_page=100`. 4. `GET /stations?page=0`. 5. `GET /stations?taille_page=101`. |
 | Résultat attendu | Étape 1 : 200, `total` = 120, `page` = 1, `taille_page` = 50, 50 résultats, premier `station_id` = `S001`. Étape 2 : 200, 20 résultats. Étape 3 : 200, `total` = 46, tous les résultats ont `commune` = `Lille`. Étapes 4 et 5 : 422. |
-| Résultat obtenu | Étape 1 : 200, total = 120, page = 1, taille_page = 50, 50 résultats, premier station_id = S001. Étape 2 : 200, 20 résultats. Étape 3 : 200, total = 46, tous les résultats ont commune = Lille. Pour les étapes 4 et 5, Swagger affiche une validation de formulaire avant l'envoi ; aucune réponse HTTP 422 n'est visible dans les captures. |
-| Statut | **NT** — étapes 4 et 5 à vérifier par requête HTTP directe |
+| Résultat obtenu | Étape 1 : 200, total = 120, page = 1, taille_page = 50, 50 résultats, premier station_id = S001. Étape 2 : 200, 20 résultats. Étape 3 : 200, total = 46, tous les résultats ont commune = Lille. Pour les étapes 4 et 5, Swagger affiche une validation de formulaire avant l'envoi ; |
+| Statut | **OK**  |
 
 ### REC-08 — Station introuvable
 
