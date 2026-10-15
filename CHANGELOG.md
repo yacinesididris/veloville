@@ -30,7 +30,17 @@ Version de l'application avant la campagne de recette.
 - Front Streamlit tabulaire et premiers tests unitaires des services.
 
 ### Modifié
-- Aucun changement spécifique recensé pour cette version.
+- Les doublons déjà présents en base sont gérés au moment de l'insertion dans
+  `importer.py` ; les fonctions de fiabilisation restent indépendantes de la
+  base et ne réalisent pas de nettoyage ni de test nécessitant une connexion
+  à celle-ci.
 
 ### Corrigé
-- Aucun correctif spécifique recensé pour cette version.
+- Correction d'une fonction de fiabilisation qui utilisait `station_id` au lieu
+  de la colonne passée en paramètre, notamment pour `station_depart` et
+  `station_arrivee`.
+- Ajout de la colonne `type_incident` oubliée dans le script SQL.
+- Correction du type de `capacite` dans le modèle de station : `Integer` au
+  lieu de `Decimal`, conformément au schéma SQL déjà défini.
+- Correction de l'indentation de la classe `Incident` dans les modèles, qui
+  empêchait le lancement ; FastAPI démarrait correctement après correction.
