@@ -2,14 +2,22 @@
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from api.database import get_db
-from api.schemas import ActiviteParJourReponse, StationsActivesReponse
-from api.services.indicateurs import activite_par_jour, stations_actives
+from api.schemas import (
+    ActiviteParJourReponse,
+    IncidentsParStatutReponse,
+    StationsActivesReponse,
+)
+from api.services.indicateurs import (
+    activite_par_jour,
+    incidents_par_statut,
+    stations_actives,
+)
 
-router = APIRouter(prefix="/indicateurs")
+router = APIRouter(prefix="/indicateurs", tags=["Indicateurs"])
 
 
 @router.get("/activite-par-jour", response_model=ActiviteParJourReponse)
@@ -20,33 +28,26 @@ def get_activite_par_jour(
 ):
     try:
         donnees = activite_par_jour(db, date_debut, date_fin)
-    except ValueError as exc: #on récupère l'exeption value error déjà configurée dans activite_par_jour()
+    except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    if not donnees:
-        raise HTTPException(
-            status_code=404,
-            detail="Pas de données pour ces valeurs de dates"
-        )
     return {"donnees": donnees}
-
-
 
 
 @router.get("/stations-actives", response_model=StationsActivesReponse)
-def get_activite_par_jour(
-    limit: int =10,
+def get_stations_actives(
+    limite: int = Query(default=10, ge=1),
     db: Session = Depends(get_db),
 ):
     try:
-        donnees = stations_actives(db, limit)
-    except ValueError as exc: #on récupère l'exeption value error déjà configurée dans activite_par_jour()
+        donnees = stations_actives(db, limite)
+    except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-    if not donnees:
-        raise HTTPException(
-            status_code=404,
-            detail="Pas de données trouvées"
-        )
     return {"donnees": donnees}
 
+
+@router.get("/incidents-par-statut", response_model=IncidentsParStatutReponse,)
+def get_incidents_par_statut(
+    db: Session = Depends(get_db),
+):
+    return incidents_par_statut(db)

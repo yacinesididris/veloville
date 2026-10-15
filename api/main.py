@@ -19,7 +19,7 @@ async def lifespan(app : FastAPI):
 
 app = FastAPI(title="Titre de l'API", lifespan=lifespan)
 
-@app.get("/sante")
+@app.get("/sante", tags=["Santé"])
 def verifier_sante():
     return {"statut" : "ok"}
 

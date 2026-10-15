@@ -95,7 +95,7 @@ class StationActiveReponse(BaseModel):
 
 
 class StationsActivesReponse(BaseModel):
-    reponse: list[StationActiveReponse]
+    donnees: list[StationActiveReponse]
 
 
 class IncidentsParStatutItem(BaseModel):
@@ -104,5 +104,5 @@ class IncidentsParStatutItem(BaseModel):
 
 
 class IncidentsParStatutReponse(BaseModel):
-    reponse: list[IncidentsParStatutItem]
+    donnees: list[IncidentsParStatutItem]
     delai_moyen_resolution_heures: float | None
