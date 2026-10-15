@@ -14,11 +14,16 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy import MetaData, Table, select
 from api.database import engine
 from datetime import datetime
+from pathlib import Path
 from api.services.fiabilisation import (
+nettoyage_capacite_station,
 nettoyage_doublons, nettoyage_horodatage_obligatoire, nettoyage_trajets_invalides,
 nettoyage_dates_resolution_incoherentes, nettoyage_pb_de_casse, nettoyage_ref_station_id_obligatoire,
 nettoyage_ref_velo_id_optionnel, nettoyage_horodatage_optionnel, nettoyage_ref_station_id_optionnel,
-nettoyage_ref_velo_id_obligatoire)
+nettoyage_ref_velo_id_obligatoire, nettoyage_station_arrivee_inconnue,
+nettoyage_usager_ref_trajet, nettoyage_station_depart_inconnue,
+nettoyage_cible_incident, nettoyage_coherence_date_resolution,
+signaler_technicien_manquant)
 
 incidents_path = "data/incidents.csv"
 stations_path = "data/stations.csv"
@@ -28,44 +33,18 @@ trajets_path = "data/trajets.csv"
 metadata = MetaData()
 
 
-def lire_csv(file_path: str) -> pd.DataFrame:
-    return pd.read_csv(file_path)
+def lire_csv(file_path: str, dtype: dict[str, str] | None = None) -> pd.DataFrame:
+    return pd.read_csv(file_path, dtype=dtype)
 
-
-
-
-def preparation_incidents(df: pd.DataFrame):
-    logs_import_incidents = []
-    
-    df, logs = nettoyage_horodatage_obligatoire(df, "date_signalement")
-    logs_import_incidents.extend(logs)
-
-    df, logs = nettoyage_horodatage_optionnel(df, "date_resolution")
-    logs_import_incidents.extend(logs)
-
-    df, logs = nettoyage_dates_resolution_incoherentes(df)
-    logs_import_incidents.extend(logs)
-
-    df, logs = nettoyage_pb_de_casse(df)
-    logs_import_incidents.extend(logs)
-
-    df, logs = nettoyage_ref_station_id_optionnel(df, "station_id" )
-    logs_import_incidents.extend(logs)
-
-    df, logs = nettoyage_ref_velo_id_optionnel(df)
-    logs_import_incidents.extend(logs)
-
-    df, logs = nettoyage_doublons(df, "incident_id")
-    logs_import_incidents.extend(logs)
-
-
-    return df, logs_import_incidents
 
 
 
 def preparation_stations(df: pd.DataFrame):
     logs_import_stations = []
     
+    df, logs = nettoyage_capacite_station(df)
+    logs_import_stations.extend(logs)
+
     df, logs = nettoyage_ref_station_id_obligatoire(df, "station_id")
     logs_import_stations.extend(logs)
 
@@ -87,25 +66,63 @@ def preparation_trajets(df: pd.DataFrame, station_ids: set[str]):
     df, logs = nettoyage_ref_station_id_obligatoire(df, "station_depart")
     logs_import_trajets.extend(logs)
 
+    df, logs = nettoyage_station_depart_inconnue(df, station_ids)
+    logs_import_trajets.extend(logs)
+
     df, logs = nettoyage_ref_station_id_optionnel(df, "station_arrivee")
     logs_import_trajets.extend(logs)
 
-    arrivee_inconnue = df["station_arrivee"].notna() & ~df["station_arrivee"].isin(station_ids)
-    for index in df.index[arrivee_inconnue]:
-        logs_import_trajets.append({
-            "numero-ligne": index,
-            "motif": f"station_arrivee inconnue ({df.at[index, 'station_arrivee']})",
-            "décision": "référence mise à nul",
-        })
-    df.loc[arrivee_inconnue, "station_arrivee"] = None
+    df, logs = nettoyage_station_arrivee_inconnue(df, station_ids)
+    logs_import_trajets.extend(logs)
 
     df, logs = nettoyage_trajets_invalides(df)
+    logs_import_trajets.extend(logs)
+
+    df, logs = nettoyage_usager_ref_trajet(df)
     logs_import_trajets.extend(logs)
 
     df, logs = nettoyage_doublons(df, "trajet_id")
     logs_import_trajets.extend(logs)
 
     return df, logs_import_trajets
+
+
+def preparation_incidents(df: pd.DataFrame, station_ids: set[str]):
+    logs_import_incidents = []
+    
+    df, logs = nettoyage_horodatage_obligatoire(df, "date_signalement")
+    logs_import_incidents.extend(logs)
+
+    df, logs = nettoyage_horodatage_optionnel(df, "date_resolution")
+    logs_import_incidents.extend(logs)
+
+    df, logs = nettoyage_pb_de_casse(df)
+    logs_import_incidents.extend(logs)
+
+    df, logs = nettoyage_dates_resolution_incoherentes(df)
+    logs_import_incidents.extend(logs)
+
+    df, logs = nettoyage_coherence_date_resolution(df)
+    logs_import_incidents.extend(logs)
+
+    df, logs = nettoyage_ref_station_id_optionnel(df, "station_id" )
+    logs_import_incidents.extend(logs)
+
+    df, logs = nettoyage_ref_velo_id_optionnel(df)
+    logs_import_incidents.extend(logs)
+
+    df, logs = nettoyage_cible_incident(df, station_ids)
+    logs_import_incidents.extend(logs)
+
+    df, logs = nettoyage_doublons(df, "incident_id")
+    logs_import_incidents.extend(logs)
+
+    df, logs = signaler_technicien_manquant(df)
+    logs_import_incidents.extend(logs)
+
+
+    return df, logs_import_incidents
+
 
 # permet d'UPDATE et INSERT en controlant les doublons dans la table (update choisit si on ignore ou on update)
 def upsert(df, nom_table, nom_colonne_pk, update=False):
@@ -146,6 +163,7 @@ def upsert(df, nom_table, nom_colonne_pk, update=False):
 
     else:
 
+        # index_elements désigne la clé primaire utilisée pour repérer les doublons.
         stmt = stmt.on_conflict_do_nothing(
             index_elements=[nom_colonne_pk]
         )
@@ -178,7 +196,8 @@ def generer_rapport_import(logs_stations,
                            nb_stations,
                            nb_trajets,
                            nb_incidents_inseres,
-                           nb_incidents_mis_a_jour):
+                           nb_incidents_mis_a_jour,
+                           fichiers_absents):
     date_rapport = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
 
     with open(f"./docs/rapports/rapport_importation_{date_rapport}.txt", "w", encoding="utf-8") as f:
@@ -222,17 +241,44 @@ def generer_rapport_import(logs_stations,
         f.write(f"Trajets insérés : {nb_trajets}\n")
         f.write(f"Incidents insérés : {nb_incidents_inseres}\n")
         f.write(f"Incidents mis à jour : {nb_incidents_mis_a_jour}\n\n")
+
+        if fichiers_absents:
+            f.write("=============== FICHIERS ABSENTS ===============\n\n")
+            for fichier in fichiers_absents:
+                f.write(f"Fichier absent : {fichier}\n")
             
             
 
 def importer_csv():
-    df_stations, logs_stations = preparation_stations(lire_csv(stations_path))
-    station_ids = set(df_stations["station_id"])
-    df_trajets, logs_trajets = preparation_trajets(
-        lire_csv(trajets_path),
-        station_ids,
-    )
-    df_incidents, logs_incidents = preparation_incidents(lire_csv(incidents_path))
+    fichiers_absents = []
+
+    if Path(stations_path).is_file():
+        df_stations, logs_stations = preparation_stations(
+            lire_csv(stations_path, dtype={"capacite": "string"})
+        )
+    else:
+        df_stations, logs_stations = pd.DataFrame(), []
+        fichiers_absents.append(stations_path)
+
+    station_ids = set(df_stations["station_id"]) if "station_id" in df_stations else set()
+
+    if Path(trajets_path).is_file():
+        df_trajets, logs_trajets = preparation_trajets(
+            lire_csv(trajets_path),
+            station_ids,
+        )
+    else:
+        df_trajets, logs_trajets = pd.DataFrame(), []
+        fichiers_absents.append(trajets_path)
+
+    if Path(incidents_path).is_file():
+        df_incidents, logs_incidents = preparation_incidents(
+            lire_csv(incidents_path),
+            station_ids,
+        )
+    else:
+        df_incidents, logs_incidents = pd.DataFrame(), []
+        fichiers_absents.append(incidents_path)
 
 
     nb_stations, _ = upsert(df_stations,"station","station_id",update=False)
@@ -252,6 +298,7 @@ def importer_csv():
         nb_trajets,
         nb_incidents_inseres,
         nb_incidents_mis_a_jour,
+        fichiers_absents,
     )
 
     print("Import terminé. Rapport généré dans docs/rapport_importation_csv.txt")

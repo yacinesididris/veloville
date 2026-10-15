@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS station (
     station_id VARCHAR(10) PRIMARY KEY,
     nom VARCHAR(100) NOT NULL,
     commune VARCHAR(100) NOT NULL,
-    capacite INT NOT NULL CHECK (capacite > 0),
+    capacite INTEGER NOT NULL CHECK (capacite > 0),
     latitude NUMERIC(8,5) NOT NULL CHECK (latitude BETWEEN -90 AND 90),
     longitude NUMERIC(8,5) NOT NULL CHECK (longitude BETWEEN -180 AND 180),
     date_mise_en_service DATE NOT NULL
@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS incident (
 								'frein defectueux', 
 								'borne hors service')),
 	statut VARCHAR(10) NOT NULL 
-        CHECK (statut IN ('ouvert', 'en cours', 'resolu')),
+        CHECK (statut IN ('ouvert', 'en_cours', 'resolu')),
     date_resolution TIMESTAMP,
     technicien VARCHAR(100),
 
@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS incident (
             AND date_resolution >= date_signalement 
             AND date_resolution IS NOT NULL  ) 
         OR 
-        (statut IN ('ouvert', 'en cours') AND date_resolution IS NULL)) 
+        (statut IN ('ouvert', 'en_cours') AND date_resolution IS NULL)) 
 );
 
 
@@ -97,7 +97,6 @@ CREATE INDEX IF NOT EXISTS idx_station_arrivee on trajet(station_arrivee);
 CREATE INDEX IF NOT EXISTS idx_date_signalement on incident(date_signalement);
 CREATE INDEX IF NOT EXISTS idx_resolution on incident(date_resolution);
 CREATE INDEX IF NOT EXISTS idx_username on utilisateur(username);
-
 
 
 

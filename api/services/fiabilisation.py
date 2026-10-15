@@ -1,298 +1,562 @@
-"""Règles de fiabilisation des données (module métier testé).
+"""Règles de fiabilisation des données, sans accès à la base de données."""
 
-À compléter : fonctions pures, sans accès à la base, qui normalisent ou rejettent
-une valeur ou une ligne : horodatages, identifiants de vélo, statuts
-d'incident, durées, références de station, cohérence des dates,
-doublons. Chaque fonction retourne la valeur normalisée ou signale le
-motif de rejet. Ces fonctions sont appelées par scripts/importer.py et
-couvertes par tests/unit/.
-"""
-
+import logging
 
 import pandas as pd
 
 
-PATTERN_STATION = r"^S\d{3}$"
-PATTERN_VELO = r"^V\d{4}$" 
+logger = logging.getLogger(__name__)
 
+PATTERN_STATION = r"^S\d{3}$"
+PATTERN_VELO = r"^V\d{4}$"
+
+
+class LigneRejeteeError(ValueError):
+    """Erreur métier levée pour une ligne rejetée."""
+
+    def __init__(self, log: dict):
+        self.log = log
+        super().__init__(
+            f"Ligne {log['numero-ligne']} rejetée : {log['motif']}"
+        )
+
+
+def lever_erreur_rejet(log: dict) -> None:
+    """Lève l'erreur correspondant à un rejet, notamment pour les tests."""
+    raise LigneRejeteeError(log)
+
+
+def _finaliser_nettoyage(dataframe: pd.DataFrame, logs: list[dict]):
+    for log in logs:
+        if log["décision"] != "rejeté":
+            continue
+        try:
+            lever_erreur_rejet(log)
+        except LigneRejeteeError as erreur:
+            logger.error("%s", erreur)
+    return dataframe, logs
+
+
+#=== Règles universelles : éviter les doublons
 
 def nettoyage_doublons(dataframe: pd.DataFrame, nom_colonne_pk: str):
-    df = dataframe.copy()  #.copy : pour travailler sur une copie interne à la fonction du Dataframe
-    logs = []
-
-    # subset : se concentre sur la colonne pour les doublons, demande une liste
-    # keep='first' : la première occurrence est gardée, les suivantes sont marquées True
-    doublon = df.duplicated(subset=[nom_colonne_pk], keep='first')
-
-    if doublon.any():
-        lignes_doublons = df[doublon]
-
-        for index in lignes_doublons.index:
-            logs.append({
-                "numero-ligne": index,
-                "motif": f"doublon sur la clé {nom_colonne_pk}",
-                "décision": "rejeté"
-            })
-
-        df = df[~doublon]
-
-    return df, logs
-
-
-def nettoyage_trajets_invalides(dataframe: pd.DataFrame):
     df = dataframe.copy()
-    logs = []
-
-    # errors='coerce' : le texte illisible devient NaN, comme une durée manquante
-    durees = pd.to_numeric(df['duree_secondes'], errors='coerce')
-
-    # ~(durees > 0) couvre : durée <= 0, durée manquante (NaN) et durée illisible
-    trajet_invalide = ~(durees > 0)
-
-    if trajet_invalide.any():
-        for index in df.index[trajet_invalide]:
-            logs.append({"numero-ligne": index,
-                            "motif" : "trajet invalide (durée nulle, négative, manquante ou illisible)",
-                            "décision": "rejeté"})
-
-    df['duree_secondes'] = durees
-    df = df[~trajet_invalide]
-
-    return df, logs
-
-
-def nettoyage_dates_resolution_incoherentes(dataframe: pd.DataFrame):
-    df = dataframe.copy()
-    date_resolution_incoherente =  df[(df['date_resolution'] < df['date_signalement']) & (df['date_resolution'].notnull())]
-    logs = []
-    if not date_resolution_incoherente.empty:
-        for index in date_resolution_incoherente.index:
-            logs.append({"numero-ligne": index,
-                            "motif" : "date de résolution incohérente",
-                            "décision": "rejeté"})
-        df = df[(df['date_resolution'] >= df['date_signalement']) | (df['date_resolution'].isnull())]
-
-    return df, logs
-
-
-def nettoyage_pb_de_casse(dataframe: pd.DataFrame):
-    df = dataframe.copy()
-    statuts_valides = ['ouvert', 'en cours', 'resolu']
-
-    brute = df['statut'].astype("string")    #converti en string pour éviter les erreurs en cas de NotaNumber (NaN)
-    apres_normalisation = brute.str.strip().str.lower()
-
-    #On teste la version normalisée et la version brute pour distinguer si la normalisation corrige le problème
-    valide_avant = brute.isin(statuts_valides)
-    valide_apres = apres_normalisation.isin(statuts_valides)
-
-    masque_corrige = ~valide_avant & valide_apres     # réparées par la normalisation
-    masque_rejete = ~valide_apres                     # ne remonte pas même après normalisation
-
-    logs = []
-    for index in df.index[masque_corrige]:
-        logs.append({
-            "numero-ligne": index,
-            "motif": "statut mal formaté (casse/espaces)",
-            "décision": "normalisé"
-        })
-
-    for index in df.index[masque_rejete]:
-        logs.append({
-            "numero-ligne": index,
-            "motif": "statut manquant" if pd.isna(brute.at[index]) else "statut invalide",
-            "décision": "rejeté"
-        })
-
-    df.loc[masque_corrige, 'statut'] = apres_normalisation[masque_corrige]  # on ne modifie que les lignes ciblées
-    df = df.loc[~masque_rejete]
-
-    return df, logs
-
-
-def nettoyage_ref_station_id_obligatoire (dataframe: pd.DataFrame, nom_colonne: str):
-    df = dataframe.copy()
-
-    brute = df[nom_colonne].astype("string")    #converti en string pour éviter les erreurs en cas de NotaNumber (NaN)
-    apres_normalisation = brute.str.strip().str.upper()
-
-    #On teste la version normalisée et la version brute pour distinguer si la normalisation corrige le problème
-    valide_avant = brute.str.fullmatch(PATTERN_STATION).fillna(False).astype(bool)
-    valide_apres = apres_normalisation.str.fullmatch(PATTERN_STATION).fillna(False).astype(bool)
-
-    masque_corrige = ~valide_avant & valide_apres     # réparées par la normalisation
-    masque_rejete = ~valide_apres                     # ne remonte pas même après normalisation
-
-    logs = [{"numero-ligne": index,      # compréhension de liste [expression for variable in iterable]
-             "motif": "station_id mal formaté (casse/espaces)", 
-             "décision": "normalisé"}
-        for index in df.index[masque_corrige]  #df.index[masque_corrige] : index des lignes où masque_corrige vaut True
-    ]
-    logs += [
+    doublons = df.duplicated(subset=[nom_colonne_pk], keep="first")
+    logs = [
         {
             "numero-ligne": index,
-            "motif": "station_id manquant" if pd.isna(brute.at[index]) else "station_id invalide",
+            "motif": f"doublon sur la clé {nom_colonne_pk}",
+            "décision": "rejeté",
+        }
+        for index in df.index[doublons]
+    ]
+    return _finaliser_nettoyage(df.loc[~doublons], logs)
+
+
+#=== RG1 : capacité positive entière et station_id obligatoire
+
+def nettoyage_capacite_station(dataframe: pd.DataFrame):
+    df = dataframe.copy()
+    capacites_txt = df["capacite"].astype("string").str.strip()
+    format_entier = capacites_txt.str.fullmatch(r"\d+").fillna(False)
+    capacites = pd.Series(
+        [
+            int(valeur) if est_entier else None
+            for valeur, est_entier in zip(
+                capacites_txt.tolist(),
+                format_entier.tolist(),
+            )
+        ],
+        index=df.index,
+        dtype=object,
+    )
+    capacite_valide = capacites.map(
+        lambda valeur: valeur is not None and valeur > 0
+    )
+
+    logs = [
+        {
+            "numero-ligne": index,
+            "motif": (
+                "capacité manquante"
+                if pd.isna(df.at[index, "capacite"])
+                else "capacité invalide (doit être un entier strictement positif)"
+            ),
+            "décision": "rejeté",
+        }
+        for index in df.index[~capacite_valide]
+    ]
+
+    df = df.loc[capacite_valide].copy()
+    df["capacite"] = capacites.loc[capacite_valide]
+    return _finaliser_nettoyage(df, logs)
+
+
+def nettoyage_ref_station_id_obligatoire(
+    dataframe: pd.DataFrame,
+    nom_colonne: str,
+):
+    """Valide l'identifiant de station; utilisé par RG1 et RG2."""
+    df = dataframe.copy()
+    brute = df[nom_colonne].astype("string")
+    normalisee = brute.str.strip().str.upper()
+    valide_avant = brute.str.fullmatch(PATTERN_STATION).fillna(False).astype(bool)
+    valide_apres = normalisee.str.fullmatch(PATTERN_STATION).fillna(False).astype(bool)
+    masque_corrige = ~valide_avant & valide_apres
+    masque_rejete = ~valide_apres
+
+    logs = [
+        {
+            "numero-ligne": index,
+            "motif": "station_id mal formaté (casse/espaces)",
+            "décision": "normalisé",
+        }
+        for index in df.index[masque_corrige]
+    ]
+    logs.extend(
+        {
+            "numero-ligne": index,
+            "motif": (
+                "station_id manquant"
+                if pd.isna(brute.at[index])
+                else "station_id invalide"
+            ),
             "décision": "rejeté",
         }
         for index in df.index[masque_rejete]
-    ]
+    )
 
-    df.loc[masque_corrige, nom_colonne] = apres_normalisation[masque_corrige]
-    df = df.loc[~masque_rejete]
-
-    return df, logs
+    df.loc[masque_corrige, nom_colonne] = normalisee[masque_corrige]
+    return _finaliser_nettoyage(df.loc[~masque_rejete], logs)
 
 
-def nettoyage_ref_station_id_optionnel(dataframe: pd.DataFrame, nom_colonne: str):
+def nettoyage_station_depart_inconnue(
+    dataframe: pd.DataFrame,
+    station_ids: set[str],
+):
+    """Rejette les trajets dont la station de départ n'existe pas (RG2)."""
     df = dataframe.copy()
-
-    brute = df[nom_colonne].astype("string")    #converti en string pour éviter les erreurs en cas de NotaNumber (NaN)
-    apres_normalisation = brute.str.strip().str.upper()
-
-    #On teste la version normalisée et la version brute pour distinguer si la normalisation corrige le problème
-    valide_avant = brute.str.fullmatch(PATTERN_STATION).fillna(False).astype(bool)
-    valide_apres = apres_normalisation.str.fullmatch(PATTERN_STATION).fillna(False).astype(bool)
-
-    masque_optionnel = brute.isna() | brute.str.strip().eq("")    #valeur absente ou vide : champ optionnel
-    masque_corrige = ~valide_avant & valide_apres     # réparées par la normalisation
-    masque_rejete = ~valide_apres & ~masque_optionnel # ne remonte pas même après normalisation
-
-    logs = [{"numero-ligne": index,      # compréhension de liste [expression for variable in iterable]
-             "motif": "station_id mal formaté (casse/espaces)", 
-             "décision": "normalisé"}
-        for index in df.index[masque_corrige]  #df.index[masque_corrige] : index des lignes où masque_corrige vaut True
+    inconnue = ~df["station_depart"].isin(station_ids)
+    logs = [
+        {
+            "numero-ligne": index,
+            "motif": f"station_depart inconnue ({df.at[index, 'station_depart']})",
+            "décision": "rejeté",
+        }
+        for index in df.index[inconnue]
     ]
-    logs += [
+    return _finaliser_nettoyage(df.loc[~inconnue], logs)
+
+
+#=== RG2 / RG3 / RG6 : reference station facultative
+
+def nettoyage_ref_station_id_optionnel(
+    dataframe: pd.DataFrame,
+    nom_colonne: str,
+):
+    df = dataframe.copy()
+    brute = df[nom_colonne].astype("string")
+    normalisee = brute.str.strip().str.upper()
+    valide_avant = brute.str.fullmatch(PATTERN_STATION).fillna(False).astype(bool)
+    valide_apres = normalisee.str.fullmatch(PATTERN_STATION).fillna(False).astype(bool)
+    masque_optionnel = brute.isna() | brute.str.strip().eq("")
+    masque_corrige = ~valide_avant & valide_apres
+    masque_rejete = ~valide_apres & ~masque_optionnel
+
+    logs = [
+        {
+            "numero-ligne": index,
+            "motif": "station_id mal formaté (casse/espaces)",
+            "décision": "normalisé",
+        }
+        for index in df.index[masque_corrige]
+    ]
+    logs.extend(
         {
             "numero-ligne": index,
             "motif": "station_id invalide",
             "décision": "rejeté",
         }
         for index in df.index[masque_rejete]
+    )
+
+    df.loc[masque_corrige, nom_colonne] = normalisee[masque_corrige]
+    return _finaliser_nettoyage(df.loc[~masque_rejete], logs)
+
+
+#=== RG3 : une arrivée vers une station inconnue reste un trajet sans arrivée connue
+def nettoyage_station_arrivee_inconnue(
+    dataframe: pd.DataFrame,
+    station_ids: set[str],
+):
+    df = dataframe.copy()
+    arrivee_inconnue = (
+        df["station_arrivee"].notna()
+        & ~df["station_arrivee"].isin(station_ids)
+    )
+    logs = [
+        {
+            "numero-ligne": index,
+            "motif": (
+                "station_arrivee inconnue "
+                f"({df.at[index, 'station_arrivee']})"
+            ),
+            "décision": "référence mise à nul",
+        }
+        for index in df.index[arrivee_inconnue]
     ]
+    df.loc[arrivee_inconnue, "station_arrivee"] = None
+    return _finaliser_nettoyage(df, logs)
 
-    df.loc[masque_corrige, nom_colonne] = apres_normalisation[masque_corrige]
-    df = df.loc[~masque_rejete]
 
-    return df, logs
+#=== RG4 : validation des trajets
 
 def nettoyage_ref_velo_id_obligatoire(dataframe: pd.DataFrame):
     df = dataframe.copy()
-
-    brute = df["velo_id"].astype("string")    #converti en string pour éviter les erreurs en cas de NotaNumber (NaN)
-    apres_normalisation = brute.str.strip().str.upper()
-
-    #On teste la version normalisée et la version brute pour distinguer si la normalisation corrige le problème
+    brute = df["velo_id"].astype("string")
+    normalisee = brute.str.strip().str.upper()
     valide_avant = brute.str.fullmatch(PATTERN_VELO).fillna(False).astype(bool)
-    valide_apres = apres_normalisation.str.fullmatch(PATTERN_VELO).fillna(False).astype(bool)
+    valide_apres = normalisee.str.fullmatch(PATTERN_VELO).fillna(False).astype(bool)
+    masque_corrige = ~valide_avant & valide_apres
+    masque_rejete = ~valide_apres
 
-    masque_corrige = ~valide_avant & valide_apres     # réparées par la normalisation
-    masque_rejete = ~valide_apres                     # ne remonte pas même après normalisation
-
-    logs = [{"numero-ligne": index,      # compréhension de liste [expression for variable in iterable]
-             "motif": "velo_id mal formaté (casse/espaces)", 
-             "décision": "normalisé"}
-        for index in df.index[masque_corrige]  #df.index[masque_corrige] : index des lignes où masque_corrige vaut True
-    ]
-    logs += [
+    logs = [
         {
             "numero-ligne": index,
-            "motif": "velo_id manquant" if pd.isna(brute.at[index]) else "velo_id invalide",
+            "motif": "velo_id mal formaté (casse/espaces)",
+            "décision": "normalisé",
+        }
+        for index in df.index[masque_corrige]
+    ]
+    logs.extend(
+        {
+            "numero-ligne": index,
+            "motif": (
+                "velo_id manquant"
+                if pd.isna(brute.at[index])
+                else "velo_id invalide"
+            ),
             "décision": "rejeté",
         }
         for index in df.index[masque_rejete]
+    )
+
+    df.loc[masque_corrige, "velo_id"] = normalisee[masque_corrige]
+    return _finaliser_nettoyage(df.loc[~masque_rejete], logs)
+
+
+def nettoyage_trajets_invalides(dataframe: pd.DataFrame):
+    df = dataframe.copy()
+    durees = pd.to_numeric(df["duree_secondes"], errors="coerce")
+    duree_invalide = (
+        durees.isna()
+        | durees.le(0)
+        | durees.gt(2_147_483_647)
+        | durees.mod(1).ne(0)
+    )
+    logs = [
+        {
+            "numero-ligne": index,
+            "motif": (
+                "durée invalide (doit être un entier positif compatible avec INT)"
+            ),
+            "décision": "rejeté",
+        }
+        for index in df.index[duree_invalide]
     ]
+    df["duree_secondes"] = durees
+    df = df.loc[~duree_invalide].copy()
+    df["duree_secondes"] = df["duree_secondes"].astype("int64")
+    return _finaliser_nettoyage(df, logs)
 
-    df.loc[masque_corrige, "velo_id"] = apres_normalisation[masque_corrige]
-    df = df.loc[~masque_rejete]
 
-    return df, logs
+#=== RG5 : cohérence entre le type d'usager et son pseudonyme
+def nettoyage_usager_ref_trajet(dataframe: pd.DataFrame):
+    df = dataframe.copy()
+    type_usager = df["type_usager"].astype("string")
+    usager_ref = df["usager_ref"].astype("string")
+    ref_absente = usager_ref.isna() | usager_ref.str.strip().eq("").fillna(False)
+    abonne = type_usager.eq("abonne").fillna(False)
+    occasionnel = type_usager.eq("occasionnel").fillna(False)
+    type_valide = abonne | occasionnel
+    ligne_valide = type_valide & ((abonne & ~ref_absente) | (occasionnel & ref_absente))
+    lignes_rejetees = ~ligne_valide
 
+    logs = []
+    for index in df.index[lignes_rejetees]:
+        if not type_valide.at[index]:
+            motif = "type_usager manquant ou invalide"
+        elif abonne.at[index]:
+            motif = "usager_ref manquant pour un abonné"
+        else:
+            motif = "usager_ref renseigné pour un usager occasionnel"
+
+        logs.append({
+            "numero-ligne": index,
+            "motif": motif,
+            "décision": "rejeté",
+        })
+
+    df.loc[occasionnel & ref_absente, "usager_ref"] = None
+    return _finaliser_nettoyage(df.loc[~lignes_rejetees], logs)
+
+
+#=== RG6 : cible d'incident et référence correspondante
+
+def _motif_rejet_cible_incident(
+    index: int,
+    cible_velo: bool,
+    cible_station: bool,
+    velo_present: bool,
+    station_present: bool,
+    station_existante: bool,
+    station_id: object,
+) -> str:
+    if not (cible_velo or cible_station):
+        return "cible d'incident manquante ou invalide"
+    if cible_velo and not velo_present:
+        return "incident visant un vélo sans velo_id"
+    if cible_station and not station_present:
+        return "incident visant une station sans station_id"
+    if velo_present and station_present:
+        return "incident renseignant à la fois velo_id et station_id"
+    if cible_station and not station_existante:
+        return f"station d'incident inconnue ({station_id})"
+    raise RuntimeError(
+        f"État incohérent lors du rejet de la ligne {index} d'incident"
+    )
+
+
+def nettoyage_cible_incident(
+    dataframe: pd.DataFrame,
+    station_ids: set[str],
+):
+    df = dataframe.copy()
+    cible_brute = df["cible"].astype("string")
+    cible = cible_brute.str.strip().str.lower()
+    cible_corrigee = cible_brute.notna() & cible_brute.ne(cible).fillna(False)
+    df["cible"] = cible
+
+    velo_brut = df["velo_id"].astype("string")
+    station_brute = df["station_id"].astype("string")
+    velo_present = velo_brut.notna() & velo_brut.str.strip().ne("").fillna(False)
+    station_present = (
+        station_brute.notna() & station_brute.str.strip().ne("").fillna(False)
+    )
+    cible_velo = cible.eq("velo").fillna(False)
+    cible_station = cible.eq("station").fillna(False)
+
+    references_coherentes = (
+        (cible_velo & velo_present & ~station_present)
+        | (cible_station & station_present & ~velo_present)
+    )
+    station_existante = ~cible_station | df["station_id"].isin(station_ids)
+    valide = references_coherentes & station_existante
+    rejete = ~valide
+
+    logs = [
+        {
+            "numero-ligne": index,
+            "motif": "cible d'incident normalisée (casse/espaces)",
+            "décision": "normalisé",
+        }
+        for index in df.index[cible_corrigee]
+    ]
+    for index in df.index[rejete]:
+        motif = _motif_rejet_cible_incident(
+            index=index,
+            cible_velo=cible_velo.at[index],
+            cible_station=cible_station.at[index],
+            velo_present=velo_present.at[index],
+            station_present=station_present.at[index],
+            station_existante=station_existante.at[index],
+            station_id=df.at[index, "station_id"],
+        )
+
+        logs.append({
+            "numero-ligne": index,
+            "motif": motif,
+            "décision": "rejeté",
+        })
+
+    df.loc[~velo_present, "velo_id"] = None
+    df.loc[~station_present, "station_id"] = None
+    return _finaliser_nettoyage(df.loc[~rejete], logs)
+
+
+#=== RG6 : format des références facultatives aux vélos dans les incidents
 
 def nettoyage_ref_velo_id_optionnel(dataframe: pd.DataFrame):
     df = dataframe.copy()
-
-    brute = df["velo_id"].astype("string")    #converti en string pour éviter les erreurs en cas de NotaNumber (NaN)
-    apres_normalisation = brute.str.strip().str.upper()
-
-    #On teste la version normalisée et la version brute pour distinguer si la normalisation corrige le problème
+    brute = df["velo_id"].astype("string")
+    normalisee = brute.str.strip().str.upper()
     valide_avant = brute.str.fullmatch(PATTERN_VELO).fillna(False).astype(bool)
-    valide_apres = apres_normalisation.str.fullmatch(PATTERN_VELO).fillna(False).astype(bool)
+    valide_apres = normalisee.str.fullmatch(PATTERN_VELO).fillna(False).astype(bool)
+    masque_optionnel = brute.isna() | brute.str.strip().eq("")
+    masque_corrige = ~valide_avant & valide_apres
+    masque_rejete = ~valide_apres & ~masque_optionnel
 
-    masque_optionnel = brute.isna() | brute.str.strip().eq("")    #valeur absente ou vide : champ optionnel
-    masque_corrige = ~valide_avant & valide_apres     # réparées par la normalisation
-    masque_rejete = ~valide_apres & ~masque_optionnel # ne remonte pas même après normalisation
-
-    logs = [{"numero-ligne": index,      # compréhension de liste [expression for variable in iterable]
-             "motif": "velo_id mal formaté (casse/espaces)", 
-             "décision": "normalisé"}
-        for index in df.index[masque_corrige]  #df.index[masque_corrige] : index des lignes où masque_corrige vaut True
+    logs = [
+        {
+            "numero-ligne": index,
+            "motif": "velo_id mal formaté (casse/espaces)",
+            "décision": "normalisé",
+        }
+        for index in df.index[masque_corrige]
     ]
-    logs += [
+    logs.extend(
         {
             "numero-ligne": index,
             "motif": "velo_id invalide",
             "décision": "rejeté",
         }
         for index in df.index[masque_rejete]
-    ]
+    )
 
-    df.loc[masque_corrige, "velo_id"] = apres_normalisation[masque_corrige]
-    df = df.loc[~masque_rejete]
+    df.loc[masque_corrige, "velo_id"] = normalisee[masque_corrige]
+    df.loc[masque_optionnel, "velo_id"] = None
+    return _finaliser_nettoyage(df.loc[~masque_rejete], logs)
 
-    return df, logs
 
+#=== RG7 : statuts d'incident autorisés et normalisés
 
-def nettoyage_horodatage_obligatoire(dataframe: pd.DataFrame, nom_colonne: str):
+def nettoyage_pb_de_casse(dataframe: pd.DataFrame):
     df = dataframe.copy()
-    logs = []
+    brute = df["statut"].astype("string")
+    normalisee = brute.str.strip().str.lower()
+    normalisee = normalisee.replace({"en cours": "en_cours"})
+    valide_avant = brute.isin(["ouvert", "en_cours", "resolu"])
+    valide_apres = normalisee.isin(["ouvert", "en_cours", "resolu"])
+    masque_corrige = ~valide_avant & valide_apres
+    masque_rejete = ~valide_apres
 
-    # errors='coerce' transforme les dates impossibles à lire en NaT (Not a Time)
-    dates_converties = pd.to_datetime(df[nom_colonne], errors='coerce')
+    logs = [
+        {
+            "numero-ligne": index,
+            "motif": "statut mal formaté (casse/espaces)",
+            "décision": "normalisé",
+        }
+        for index in df.index[masque_corrige]
+    ]
+    logs.extend(
+        {
+            "numero-ligne": index,
+            "motif": (
+                "statut manquant"
+                if pd.isna(brute.at[index])
+                else "statut invalide"
+            ),
+            "décision": "rejeté",
+        }
+        for index in df.index[masque_rejete]
+    )
 
-    # Champ obligatoire : une date NaT après conversion est invalide, qu'elle soit illisible OU manquante
+    df.loc[masque_corrige, "statut"] = normalisee[masque_corrige]
+    return _finaliser_nettoyage(df.loc[~masque_rejete], logs)
+
+
+#=== RG8 : dates de signalement, résolution et cohérence chronologique
+
+def nettoyage_horodatage_obligatoire(
+    dataframe: pd.DataFrame,
+    nom_colonne: str,
+):
+    df = dataframe.copy()
+    dates_converties = pd.to_datetime(df[nom_colonne], errors="coerce")
     date_invalide = dates_converties.isna()
 
-    if date_invalide.any():
-        lignes_invalides = df[date_invalide]
-
-        for index, valeur in lignes_invalides[nom_colonne].items():
-            if pd.isna(valeur):
-                motif = f"horodatage manquant dans la colonne {nom_colonne}"
-            else:
-                motif = f"horodatage invalide dans la colonne {nom_colonne}"
-
-            logs.append({
-                "numero-ligne": index,
-                "motif": motif,
-                "décision": "rejeté"
-            })
-
-        df[nom_colonne] = dates_converties
-        df = df[~date_invalide]
-    else:
-        df[nom_colonne] = dates_converties
-
-    return df, logs
-
-
-def nettoyage_horodatage_optionnel(dataframe: pd.DataFrame, nom_colonne: str):
-    df = dataframe.copy()
-    logs = []
-    dates_converties = pd.to_datetime(df[nom_colonne], errors='coerce')
-
-    # Les cellules déjà vides ne sont pas des erreurs
-    date_invalide = dates_converties.isna() & df[nom_colonne].notna()
-
-    if date_invalide.any():
-        lignes_invalides = df[date_invalide]
-
-        for index in lignes_invalides.index:
-            logs.append({
-                "numero-ligne": index,
-                "motif": f"horodatage invalide ou illisible dans la colonne {nom_colonne} (converti en nul)",
-                "décision": "normalisé"
-            })
-
+    logs = [
+        {
+            "numero-ligne": index,
+            "motif": (
+                f"horodatage manquant dans la colonne {nom_colonne}"
+                if pd.isna(valeur)
+                else f"horodatage invalide dans la colonne {nom_colonne}"
+            ),
+            "décision": "rejeté",
+        }
+        for index, valeur in df.loc[date_invalide, nom_colonne].items()
+    ]
     df[nom_colonne] = dates_converties
-    return df, logs
+    return _finaliser_nettoyage(df.loc[~date_invalide], logs)
+
+
+def nettoyage_horodatage_optionnel(
+    dataframe: pd.DataFrame,
+    nom_colonne: str,
+):
+    df = dataframe.copy()
+    dates_converties = pd.to_datetime(df[nom_colonne], errors="coerce")
+    date_invalide = dates_converties.isna() & df[nom_colonne].notna()
+    logs = [
+        {
+            "numero-ligne": index,
+            "motif": (
+                f"horodatage invalide ou illisible dans la colonne "
+                f"{nom_colonne} (converti en nul)"
+            ),
+            "décision": "normalisé",
+        }
+        for index in df.index[date_invalide]
+    ]
+    df[nom_colonne] = dates_converties
+    return _finaliser_nettoyage(df, logs)
+
+
+def nettoyage_dates_resolution_incoherentes(dataframe: pd.DataFrame):
+    df = dataframe.copy()
+    incoherente = (
+        (df["date_resolution"] < df["date_signalement"])
+        & df["date_resolution"].notna()
+    )
+    logs = [
+        {
+            "numero-ligne": index,
+            "motif": "date de résolution incohérente",
+            "décision": "rejeté",
+        }
+        for index in df.index[incoherente]
+    ]
+    df = df.loc[~incoherente]
+    return _finaliser_nettoyage(df, logs)
+
+
+def nettoyage_coherence_date_resolution(dataframe: pd.DataFrame):
+    """La date de résolution est présente exactement quand le statut est résolu (RG8)."""
+    df = dataframe.copy()
+    resolu = df["statut"].eq("resolu")
+    date_presente = df["date_resolution"].notna()
+    incoherente = resolu.ne(date_presente)
+
+    logs = [
+        {
+            "numero-ligne": index,
+            "motif": (
+                "date_resolution manquante pour un incident résolu"
+                if resolu.at[index]
+                else "date_resolution renseignée pour un incident non résolu"
+            ),
+            "décision": "rejeté",
+        }
+        for index in df.index[incoherente]
+    ]
+    return _finaliser_nettoyage(df.loc[~incoherente], logs)
+
+
+def signaler_technicien_manquant(dataframe: pd.DataFrame):
+    """Journalise l'absence de technicien après prise en charge sans rejeter la ligne (RG8)."""
+    df = dataframe.copy()
+    technicien = df["technicien"].astype("string")
+    absent = technicien.isna() | technicien.str.strip().eq("").fillna(False)
+    pris_en_charge = df["statut"].isin(["en_cours", "resolu"])
+    avertissement = absent & pris_en_charge
+
+    logs = [
+        {
+            "numero-ligne": index,
+            "motif": "technicien manquant pour un incident pris en charge",
+            "décision": "avertissement",
+        }
+        for index in df.index[avertissement]
+    ]
+    return _finaliser_nettoyage(df, logs)

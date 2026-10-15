@@ -22,3 +22,10 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def init_db():
+    """Crée les tables ORM déclarées, si elles n'existent pas encore."""
+    import api.models  # noqa: F401
+
+    Base.metadata.create_all(bind=engine)
