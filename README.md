@@ -116,6 +116,17 @@ Pour ce faire :
    ```
    3. Retirer les droits ``SUPERUSER`` à l'utilisateur ``veloville``
 
+
+## Lancement des tests
+
+Pour lancer les tests, toujours depuis le terminal : 
+
+```python
+pytest --cov=api/services --cov-report=term-missing
+```
+
+
+
 ## Conventions
 
 - Lancement de l'API depuis la racine : `uvicorn api.main:app --reload`.
