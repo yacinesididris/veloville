@@ -18,13 +18,6 @@ class ConnexionReponse(BaseModel):
     role: Literal["exploitant", "direction"]
 
 
-
-
-class ActiviteParJourParametres(BaseModel):
-    date_debut: date | None = None
-    date_fin: date | None = None
-
-
 class StationsActivesParametres(BaseModel):
     limite: int = Field(default=10, ge=1)
 

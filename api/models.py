@@ -47,8 +47,8 @@ class Trajet(Base):
     " OR (type_usager = 'abonne' AND usager_ref IS NOT NULL)"),
       name="chk_usager_ref"),)
 
-    class Incident(Base):
-        __tablename__ = "incident"
+class Incident(Base):
+    __tablename__ = "incident"
 
     incident_id: Mapped[str] = mapped_column(String(12), primary_key=True)
     date_signalement: Mapped[datetime] = mapped_column(DateTime)
