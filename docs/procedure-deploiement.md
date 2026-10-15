@@ -1,122 +1,137 @@
 # Procédure de déploiement
 
-## Prérequis 
+Cette procédure décrit une installation locale reproductible depuis un poste
+vierge. Elle utilise PostgreSQL et les scripts du dépôt.
 
- - VSCode (ou similaire) avec Python 3.13 minimum
- - PGadmin (ou similaire) avec PostgreSQL 18 avec accès SUPERUSER
- - Git et compte GitHub pour clonage du dépôt
+## Prérequis
 
-## Installation
+- Python 3.12 ou supérieur.
+- PostgreSQL 14 ou supérieur.
+- Git.
+- pgAdmin (facultatif, pour créer la base et exécuter les scripts SQL).
 
-### Création de la base de donnée
+## 1. Récupérer le projet et installer les dépendances
 
-Lancer PGAdmin avec vos identifiants administrateurs de la base et lancer la ligne suivante :
+Depuis PowerShell :
 
-```sql
-CREATE ROLE veloville LOGIN PASSWORD 'veloville';
+```powershell
+git clone https://github.com/yacinesididris/veloville.git
+Set-Location veloville
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+Copy-Item .env.example .env
 ```
 
-C'est l'identifiant et le mot de passe qui seront utilisés par la solution pour se connecter au serveur
+Générer une clé JWT :
 
-Ensuite, depuis PGAdmin4, créer la database `veloville` avec comme owner le compte créé précedemment
+```powershell
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
 
-Enfin, se connecter sur la database et lancer les deux scripts dans le dossier `SQL` **dans l'ordre suivant** :
- - ``schema.sql``
- - ``comptes.sql``
+Renseigner la valeur générée dans `JWT_SECRET` du fichier `.env`. Adapter
+également `DATABASE_URL` et `TEST_DATABASE_URL` aux identifiants PostgreSQL
+choisis. Format utilisé par SQLAlchemy :
 
+```text
+postgresql+psycopg://veloville:<mot_de_passe>@localhost:5432/veloville
+postgresql+psycopg://veloville:<mot_de_passe>@localhost:5432/veloville_bdd_test
+```
 
-### Importation du dépôt
+Si le mot de passe contient des caractères réservés aux URL, les encoder
+(percent-encoding) dans les deux chaînes de connexion. Ne pas versionner le
+fichier `.env`.
 
-Depuis VSCode, le terminal pointant sur le dossier dans lequel vous souhaitez installer la solution :
+## 2. Créer et initialiser la base
 
-1. Cloner le dépôt :
-   ```python
-   git clone https://github.com/yacinesididris/veloville.git
-   cd veloville
-   ```
+Dans pgAdmin, se connecter au serveur PostgreSQL avec un compte administrateur
+et ouvrir le Query Tool sur la base `postgres`. Créer le rôle applicatif et
+la base :
 
-2. Créer l'environnement virtuel
-    ```python
-    python -m venv venv
-    ```
-    puis 
-    ```python
-    .venv\Scripts\activate
-    ```
+```sql
+CREATE ROLE veloville LOGIN PASSWORD 'choisir-un-mot-de-passe';
+CREATE DATABASE veloville OWNER veloville;
+```
 
-3. Installer les dépendances :
-    ```python
-    pip install -r requirements.txt
-    ```
+Le rôle applicatif n'a pas besoin d'être superutilisateur pour lancer l'API.
+Se connecter ensuite à la base `veloville` et exécuter, dans cet ordre :
 
-4. Créer le fichier .env
-     - A la racine du dossier se trouve le ficiher ``.env.example``. Le renommer en ``.env`` et le completer
-        
-     - Pour générer une clé secrète JWT, lancer sur le terminal la ligne de code suivante :
-    ```python
-    python -m api.securite
-    ```
+1. `sql/schema.sql`
+2. `sql/comptes.sql`
 
-     - Sur la ligne ``DATABASE_URL``, remplacez le nom d'utilisateur par ``veloville`` et le mot de passe pr celui choisi précédemment
-     - Idem pour la ligne ``TEST_DATABASE_URL``
+Les deux comptes de recette (`exploitant01` et `direction01`) sont ajoutés
+par le second script.
 
-  
-  
-### Importation des données
+## 3. Importer les données
 
-Il y'a actuellement 3 fichiers dans le dossier :
-``incidents.csv``, ``stations.csv``, ``trajets.csv``
+Depuis la racine du dépôt, avec l'environnement virtuel activé :
 
-On va utiliser le script d'importation des csv pour peupler les tables créées précédemment.
-Un rapport de nettoyage des données et d'importation dans la base de donnée apparaitra dans docs/rapports.
-
-***Le script n'insere pas de lignes déjà présentes dans la base de donnée et si l'un des fichiers n'est pas présent,
- un message d'erreur apparait dans le rapport. Le script d'importation se terminera sans erreur dans les deux cas.***
-  
-
-
-Depuis le terminal, lancer la commande suivante pour lancer le script :
-
-```python
+```powershell
 python scripts/importer.py
 ```
 
+Le script lit les fichiers de `data/` et écrit un rapport horodaté dans
+`docs/rapports/`. Le rapport signale les lignes rejetées ou normalisées et
+les éventuels fichiers absents. L'import n'écrase pas les lignes déjà
+présentes avec la même clé primaire.
 
-### Création d'un base de donnée test
+Contrôler les volumes dans pgAdmin :
 
-Pour les test qui se feront sur base de donnée, afin d'éviter tout problème à la Base Production on va créer une Base Test.
+```sql
+SELECT count(*) FROM station;
+SELECT count(*) FROM trajet;
+SELECT count(*) FROM incident;
+```
 
-Pour ce faire : 
-   1. Sur PGAdmin, donner (temporairement) des droits ``SUPERUSER`` à l'utilisateur ``veloville``
-   (clic-droit sur l'utilisateur > ``Properties...`` > onglet ``Privilèges`` > activer ``Superuser?`` )
+Pour le jeu fourni, les volumes après import sont 120 stations, 2 004 trajets
+et 177 incidents.
 
-   2. Lancer le script creer_bdd_test.py depuis le terminal
-   ```python
-   python -m scripts.creer_bdd_test
-   ```
-   3. Retirer les droits ``SUPERUSER`` à l'utilisateur ``veloville``
+## 4. Configurer et lancer les tests
 
+Les tests de base de données doivent pointer vers une base distincte,
+`veloville_bdd_test`. Après avoir initialisé `veloville`, créer une copie
+destinée aux tests :
 
-## Lancement des tests
+1. Donner temporairement le droit `SUPERUSER` au rôle `veloville` via
+   pgAdmin.
+2. Exécuter `python -m scripts.creer_bdd_test`.
+3. Retirer immédiatement le droit `SUPERUSER`.
 
-Pour lancer les tests, toujours depuis le terminal : 
+Ce script clone `veloville` vers `veloville_bdd_test` et nécessite le droit
+PostgreSQL de créer une base. Vérifier que `TEST_DATABASE_URL` dans `.env`
+pointe bien vers cette base avant d'exécuter les tests.
 
-```python
+```powershell
 pytest --cov=api/services --cov-report=term-missing
 ```
-La couverture et le pourcentage de réussite s'afficheront dans le terminal 
 
-## Lancement du programme
+Résultat de la dernière exécution consignée : 29 tests réussis et 100 % de
+couverture des modules `api/services/fiabilisation.py` et
+`api/services/indicateurs.py`. Les tests ne couvrent pas toute l'application.
 
-Dans le terminal, lancer l'API :
+## 5. Lancer l'application et vérifier l'API
 
+Dans un premier terminal PowerShell, depuis la racine et avec l'environnement
+virtuel activé :
 
-```python
+```powershell
 uvicorn api.main:app --reload
 ```
 
-Puis dans un autre terminal, toujours à la racine, lancer le front
+Dans un second terminal :
 
-```python
+```powershell
+.\.venv\Scripts\Activate.ps1
 streamlit run front/app.py
 ```
+
+Ouvrir l'adresse Streamlit affichée par la commande. Vérifier l'état de l'API
+dans un navigateur ou avec `curl.exe` :
+
+```powershell
+curl.exe -i http://localhost:8000/sante
+```
+
+Le résultat attendu est le code HTTP 200 et le corps
+`{"statut":"ok"}`. La documentation interactive est disponible à
+`http://localhost:8000/docs`.

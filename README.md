@@ -1,10 +1,5 @@
 # VéloVille — Plateforme de valorisation des données
 
-À compléter : présentation du projet, prérequis, installation, lancement de
-l'API et du front, exécution des tests, liens vers la documentation
-(docs/), auteur et version.
-
-
 ## Présentation
 
 Ceci est la V1 du projet Veloville, une application de gestion des données et des indicateurs qui doit répondre aux objectifs suivants :
@@ -20,29 +15,30 @@ Ceci est la V1 du projet Veloville, une application de gestion des données et d
 5. Distinguer ce que peut faire un exploitant (suivre et traiter les
    incidents) de ce que peut faire la direction (consulter).
 
-## Prérequis 
+## Prérequis
 
- - VSCode (ou similaire) avec Python 3.13 minimum
- - PGadmin (ou similaire) avec PostgreSQL 18 avec accès SUPERUSER
- - Git et compte GitHub pour clonage du dépôt
+- Python 3.12 ou supérieur.
+- PostgreSQL 14 ou supérieur et un client d'administration (pgAdmin est
+  facultatif).
+- Git.
 
 ## Installation
 
 ### Création de la base de donnée
 
-Lancer PGAdmin avec vos identifiants administrateurs de la base et lancer la ligne suivante :
+Dans pgAdmin, se connecter au serveur avec un compte administrateur et créer
+le rôle applicatif avec un mot de passe choisi pour l'environnement :
 
 ```sql
-CREATE ROLE veloville LOGIN PASSWORD 'veloville';
+CREATE ROLE veloville LOGIN PASSWORD 'choisir-un-mot-de-passe';
+CREATE DATABASE veloville OWNER veloville;
 ```
 
-C'est l'identifiant et le mot de passe qui seront utilisés par la solution pour se connecter au serveur
+Se connecter ensuite à la base `veloville` avec pgAdmin et exécuter les scripts
+du dépôt dans cet ordre :
 
-Ensuite, depuis PGAdmin4, créer la database `veloville` avec comme owner le compte créé précedemment
-
-Enfin, se connecter sur la database et lancer les deux scripts dans le dossier `SQL` **dans l'ordre suivant** :
- - ``schema.sql``
- - ``comptes.sql``
+1. `sql/schema.sql`
+2. `sql/comptes.sql`
 
 
 ### Importation du dépôt
@@ -55,13 +51,13 @@ Depuis VSCode, le terminal pointant sur le dossier dans lequel vous souhaitez in
    cd veloville
    ```
 
-2. Créer l'environnement virtuel
+2. Créer et activer l'environnement virtuel :
     ```python
-    python -m venv venv
+    python -m venv .venv
     ```
-    puis 
+    puis, sous Windows PowerShell :
     ```python
-    .venv\Scripts\activate
+    .\.venv\Scripts\Activate.ps1
     ```
 
 3. Installer les dépendances :
@@ -69,62 +65,83 @@ Depuis VSCode, le terminal pointant sur le dossier dans lequel vous souhaitez in
     pip install -r requirements.txt
     ```
 
-4. Créer le fichier .env
-     - A la racine du dossier se trouve le ficiher ``.env.example``. Le renommer en ``.env`` et le completer
-        
-     - Pour générer une clé secrète JWT, lancer sur le terminal la ligne de code suivante :
+4. Copier `.env.example` en `.env` (`Copy-Item .env.example .env` sous
+   PowerShell), puis remplacer les valeurs d'exemple. Les variables utilisées
+   sont :
+
+   | Variable | Usage |
+   |---|---|
+   | `DATABASE_URL` | Connexion SQLAlchemy à la base `veloville` |
+   | `TEST_DATABASE_URL` | Connexion aux tests sur `veloville_bdd_test` |
+   | `JWT_SECRET` | Clé aléatoire de signature des jetons ; ne pas la versionner |
+   | `JWT_ALGORITHM` | Algorithme JWT, par défaut `HS256` |
+   | `JWT_EXPIRE_MINUTES` | Durée de validité du jeton, par défaut 10 minutes |
+   | `API_URL` | Adresse de l'API utilisée par le front, par défaut `http://localhost:8000` |
+   | `API_TIMEOUT_SECONDES` | Délai maximal d'appel du front, par défaut 5 secondes |
+
+   Les URL de base suivent le format
+   `postgresql+psycopg://veloville:<mot_de_passe>@localhost:5432/<nom_base>`.
+   Générer la clé JWT avec :
+
     ```python
-    python -m api.securite
+    python -c "import secrets; print(secrets.token_urlsafe(32))"
     ```
 
-     - Sur la ligne ``DATABASE_URL``, remplacez le nom d'utilisateur par ``veloville`` et le mot de passe pr celui choisi précédemment
-     - Idem pour la ligne ``TEST_DATABASE_URL``
-
-  
-  
 ### Importation des données
 
-Il y'a actuellement 3 fichiers dans le dossier :
-``incidents.csv``, ``stations.csv``, ``trajets.csv``
+Les trois fichiers source sont `data/stations.csv`, `data/trajets.csv` et
+`data/incidents.csv`.
 
-On va utiliser le script d'importation des csv pour peupler les tables créées précédemment.
-Un rapport de nettoyage des données et d'importation dans la base de donnée apparaitra dans docs/rapports.
+Lancer le script suivant depuis la racine du dépôt pour peupler les tables :
 
-***Le script n'insere pas de lignes déjà présentes dans la base de donnée et si l'un des fichiers n'est pas présent,
- un message d'erreur apparait dans le rapport. Le script d'importation se terminera sans erreur dans les deux cas.***
-  
-
-
-Depuis le terminal, lancer la commande suivante pour lancer le script :
-
-```python
+```powershell
 python scripts/importer.py
 ```
 
+Un rapport de nettoyage et d'import apparaît dans `docs/rapports/`. L'import
+est idempotent pour les identifiants déjà présents : les conflits de clé
+primaire ne réécrivent pas les lignes en base. Les fichiers manquants sont
+signalés dans le rapport.
 
-### Création d'un base de donnée test
+### Audit des données importées
 
-Pour les test qui se feront sur base de donnée, afin d'éviter tout problème à la Base Production on va créer une Base Test.
+Pour le jeu fourni, les CSV contiennent 120 stations, 2 030 trajets et
+180 incidents. La recette a relevé 120 stations, 2 004 trajets et
+177 incidents insérés. Pour les trajets, 15 lignes sont rejetées et
+11 doublons écartés ; pour les incidents, 3 lignes sont rejetées. Le rapport
+d'import détaille ses décisions et motifs, mais ne récapitule pas tous les
+volumes demandés : les comptages par fichier sont donc faits manuellement
+dans [les résultats de recette](docs/recette/resultats-recette.md).
 
-Pour ce faire : 
-   1. Sur PGAdmin, donner (temporairement) des droits ``SUPERUSER`` à l'utilisateur ``veloville``
-   (clic-droit sur l'utilisateur > ``Properties...`` > onglet ``Privilèges`` > activer ``Superuser?`` )
+### Création d'une base de données de test
 
-   2. Lancer le script creer_bdd_test.py depuis le terminal
-   ```python
-   python -m scripts.creer_bdd_test
-   ```
-   3. Retirer les droits ``SUPERUSER`` à l'utilisateur ``veloville``
+Les tests de base de données doivent utiliser `veloville_bdd_test`, jamais la
+base de production. Après avoir créé et chargé `veloville`, créer la base de
+test à partir de celle-ci :
 
+1. Donner temporairement les droits `SUPERUSER` au rôle `veloville` depuis
+   pgAdmin.
+2. Lancer `python -m scripts.creer_bdd_test`.
+3. Retirer immédiatement le droit `SUPERUSER`.
+
+Le script clone la base `veloville` et crée `veloville_bdd_test`. Il nécessite
+donc un rôle PostgreSQL autorisé à créer une base et à copier le modèle. Les
+tests annulent leurs transactions à la fin de chaque test.
 
 ## Lancement des tests
 
-Pour lancer les tests, toujours depuis le terminal : 
+Avec `.env` configuré et `TEST_DATABASE_URL` pointant vers la base de test,
+lancer depuis la racine :
 
 ```python
 pytest --cov=api/services --cov-report=term-missing
 ```
-La couverture et le pourcentage de réussite s'afficheront dans le terminal 
+
+Dernière exécution documentée : **29 tests réussis** ; couverture de
+`api/services/fiabilisation.py` et `api/services/indicateurs.py` : **100 %**
+(236 instructions couvertes). Cette mesure ne représente pas la couverture de
+toute l'application : le module de tests d'intégration API est encore un
+squelette.
 
 ## Lancement du programme
 
@@ -141,13 +158,50 @@ Puis dans un autre terminal, toujours à la racine, lancer le front
 streamlit run front/app.py
 ```
 
-# Documentation
+L'API est disponible sur `http://localhost:8000` et sa documentation
+interactive sur `http://localhost:8000/docs`. Contrôler son état avec
+`http://localhost:8000/sante`.
 
+## Choix écoresponsables
 
+- Les listes sont paginées côté API afin de ne charger que les lignes
+  nécessaires à l'écran.
+- Les indicateurs sont calculés par agrégation dans PostgreSQL plutôt qu'en
+  transférant toutes les lignes vers le front.
+- Le front reste tabulaire, sans graphiques ni dépendance de visualisation
+  supplémentaire.
+- Les imports sont lancés à la demande ; aucune tâche permanente inutile ne
+  tourne en arrière-plan.
+
+## Limites connues
+
+- Le jeu livré est un extrait (environ 2 000 trajets), pas la volumétrie cible
+  de 3 millions de trajets ; une validation de charge reste à faire.
+- Les tests unitaires couvrent les services, mais les tests d'intégration
+  complets de l'API restent à écrire.
+- Le jeton de connexion Streamlit est perdu après un rechargement complet du
+  navigateur ; il faut se reconnecter.
+- Le récapitulatif des volumes d'import doit être établi manuellement à partir
+  des rapports et des comptages en base.
+
+## Documentation et version
+
+- [Schéma de données](docs/schema-donnees.md)
+- [Procédure de déploiement](docs/procedure-deploiement.md)
+- [Matrice des rôles et droits](docs/matrice-roles-droits.md)
+- [Plan et résultats de recette](docs/recette/resultats-recette.md)
+- [Journal des versions](CHANGELOG.md)
+
+## Historique Git
+
+Les versions livrées sont repérées par les tags `v0.1.0` (avant recette) et
+`v1.0.0` (après recette et corrections). Consulter les versions avec
+`git tag --list` et l'historique des branches avec
+`git log --oneline --graph --decorate --all`.
 
 ## Notes de fin
 
 
 | Auteur | Version |
 |---|---|
-| Sid Idris Yacine | V1 |
+| Sid Idris Yacine | 1.0.0 |
